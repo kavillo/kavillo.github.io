@@ -1,3 +1,4 @@
 # Kavillo's tools
-https://kavillo.github.io/planner/
-https://kavillo.github.io/barchart/
+[Project Planner](https://kavillo.github.io/planner/)
+
+[Bar Chart Creator](https://kavillo.github.io/barchart/)
