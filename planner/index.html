@@ -62,14 +62,361 @@
             AlignLeft: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" x2="3" y1="6" y2="6"/><line x1="15" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/></svg>,
             Check: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
             Maximize: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>,
-            Minimize: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+            Minimize: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>,
+            Copy: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
+            Save: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            Upload: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+            ChevronUp: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
+            ChevronDown: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         };
 
         const { 
             Download, FileSpreadsheet, Settings, RefreshCw, Type, Clock, 
             Layout, Palette, Code, AlertCircle, Grid, Trash2, Plus, 
-            Table, AlignLeft, Check, Maximize, Minimize 
+            Table, AlignLeft, Check, Maximize, Minimize, Copy, Save, Upload,
+            ChevronUp, ChevronDown
         } = Icons;
+
+        // --- Canvas Gantt Chart Renderer ---
+        const CanvasGanttChart = ({ 
+            processedData, 
+            projectTitle, 
+            activeTheme, 
+            showGridLines, 
+            scale, 
+            startDateStr, 
+            canvasRef,
+            isFullScreen,
+            customColors,
+            dateLocale 
+        }) => {
+            const containerRef = useRef(null);
+            
+            useEffect(() => {
+                if (!canvasRef.current || processedData.length === 0) return;
+                
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                
+                // Chart dimensions
+                const ROW_HEIGHT = 40;
+                const HEADER_HEIGHT = 50;
+                const VB_WIDTH = 1000;
+                const MIN_LEFT_WIDTH = 150;
+                const MAX_LEFT_WIDTH = 400;
+                const PADDING = 60; // Space between task name and duration + margins
+                
+                // Calculate dynamic left column width based on content
+                ctx.font = `500 14px ${activeTheme.font}`;
+                let maxTaskNameWidth = 0;
+                processedData.forEach(task => {
+                    const nameWidth = ctx.measureText(task.name || '').width;
+                    if (nameWidth > maxTaskNameWidth) maxTaskNameWidth = nameWidth;
+                });
+                
+                ctx.font = `12px ${activeTheme.font}`;
+                let maxDurationWidth = 0;
+                processedData.forEach(task => {
+                    const durWidth = ctx.measureText(task.rawDuration || '').width;
+                    if (durWidth > maxDurationWidth) maxDurationWidth = durWidth;
+                });
+                
+                // Also measure project title
+                ctx.font = `bold 16px ${activeTheme.font}`;
+                const titleWidth = ctx.measureText(projectTitle || '').width;
+                
+                // Calculate required width: padding + max(taskName, title) + gap + duration + padding
+                const contentWidth = Math.max(maxTaskNameWidth, titleWidth) + maxDurationWidth + PADDING;
+                const VB_LEFT_WIDTH = Math.min(MAX_LEFT_WIDTH, Math.max(MIN_LEFT_WIDTH, contentWidth));
+                const VB_CHART_WIDTH = VB_WIDTH - VB_LEFT_WIDTH;
+                
+                // Filter out silent tasks for rendering (they still affect dependency calculations)
+                const visibleTasks = processedData.filter(t => !t.isSilent);
+                
+                const maxDay = Math.max(...processedData.map(t => t.endDay), 1);
+                const totalDays = maxDay * 1.05;
+                const PIXELS_PER_DAY = VB_CHART_WIDTH / (totalDays || 1);
+                const TOTAL_HEIGHT = HEADER_HEIGHT + (visibleTasks.length * ROW_HEIGHT) + 40;
+                
+                // Calculate ticks
+                let tickInterval = 1;
+                if (scale === 'weeks') tickInterval = 7;
+                if (scale === 'months') tickInterval = 30;
+                if (scale === 'days') {
+                    // For days, increase interval based on total days to avoid overlap
+                    if (totalDays > 60) tickInterval = 7;
+                    else if (totalDays > 30) tickInterval = 5;
+                    else if (totalDays > 14) tickInterval = 2;
+                    else tickInterval = 1;
+                }
+                const estTickCount = totalDays / tickInterval;
+                if (estTickCount > 20) tickInterval *= 2;
+                const ticks = [];
+                for (let i = 0; i <= totalDays; i += tickInterval) {
+                    ticks.push(i);
+                }
+                
+                // Get label for tick
+                const locale = dateLocale || 'en';
+                
+                // Helper to capitalize first letter of each word
+                const capitalize = (str) => {
+                    return str.replace(/\b\w/g, char => char.toUpperCase());
+                };
+                
+                const getLabel = (dayIndex) => {
+                    if (startDateStr) {
+                        if (scale === 'months') {
+                            const date = new Date(startDateStr);
+                            const monthShift = Math.round(dayIndex / 30);
+                            date.setMonth(date.getMonth() + monthShift);
+                            return capitalize(date.toLocaleDateString(locale, { month: 'short' }));
+                        }
+                        if (scale === 'days') {
+                            const date = new Date(startDateStr);
+                            date.setDate(date.getDate() + dayIndex);
+                            // Show month + day at start or when month changes
+                            if (dayIndex === 0 || date.getDate() === 1) {
+                                return capitalize(date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }));
+                            }
+                            // Check if this is the first tick of a new month
+                            const prevDate = new Date(startDateStr);
+                            prevDate.setDate(prevDate.getDate() + dayIndex - tickInterval);
+                            if (prevDate.getMonth() !== date.getMonth()) {
+                                return capitalize(date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }));
+                            }
+                            return String(date.getDate());
+                        }
+                        // Weeks scale with start date - show month when it changes
+                        if (scale === 'weeks') {
+                            const date = new Date(startDateStr);
+                            date.setDate(date.getDate() + dayIndex);
+                            const weekNum = Math.floor(dayIndex / 7) + 1;
+                            // Show month + week at start or when month changes
+                            if (dayIndex === 0) {
+                                return `${capitalize(date.toLocaleDateString(locale, { month: 'short' }))} W${weekNum}`;
+                            }
+                            const prevDate = new Date(startDateStr);
+                            prevDate.setDate(prevDate.getDate() + dayIndex - tickInterval);
+                            if (prevDate.getMonth() !== date.getMonth()) {
+                                return `${capitalize(date.toLocaleDateString(locale, { month: 'short' }))} W${weekNum}`;
+                            }
+                            return `W${weekNum}`;
+                        }
+                        const date = new Date(startDateStr);
+                        date.setDate(date.getDate() + dayIndex);
+                        return capitalize(date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }));
+                    }
+                    if (scale === 'weeks') {
+                        const weekNum = Math.floor(dayIndex / 7) + 1;
+                        if (dayIndex % 7 === 0) return `W${weekNum}`;
+                        return '';
+                    }
+                    if (scale === 'months') {
+                        const monthNum = Math.floor(dayIndex / 30) + 1;
+                        if (dayIndex % 30 === 0) return `M${monthNum}`;
+                        return '';
+                    }
+                    if (scale === 'days') {
+                        return `D${dayIndex + 1}`;
+                    }
+                    return String(dayIndex);
+                };
+                
+                // Set canvas size with device pixel ratio for sharpness
+                canvas.width = VB_WIDTH * dpr;
+                canvas.height = TOTAL_HEIGHT * dpr;
+                canvas.style.width = VB_WIDTH + 'px';
+                canvas.style.height = TOTAL_HEIGHT + 'px';
+                ctx.scale(dpr, dpr);
+                
+                // Resolve colors (custom overrides theme)
+                const colors = {
+                    background: customColors.background || activeTheme.bg,
+                    rowAlt: customColors.rowAlt || activeTheme.rowAlt,
+                    taskName: customColors.taskName || activeTheme.text,
+                    duration: customColors.duration || activeTheme.textSecondary,
+                    gridLine: customColors.gridLine || activeTheme.gridLine,
+                    gridLineStrong: customColors.gridLineStrong || activeTheme.gridLineStrong,
+                    headerBg: customColors.headerBg || activeTheme.headerBg,
+                    tickLabel: customColors.tickLabel || activeTheme.textSecondary
+                };
+                
+                // Background
+                ctx.fillStyle = colors.background;
+                ctx.fillRect(0, 0, VB_WIDTH, TOTAL_HEIGHT);
+                
+                // Draw alternating row backgrounds
+                processedData.forEach((task, i) => {
+                    const y = HEADER_HEIGHT + (i * ROW_HEIGHT);
+                    ctx.fillStyle = i % 2 === 0 ? colors.background : colors.rowAlt;
+                    ctx.fillRect(0, y, VB_WIDTH, ROW_HEIGHT);
+                });
+                
+                // Header background
+                ctx.fillStyle = colors.headerBg;
+                ctx.fillRect(0, 0, VB_WIDTH, HEADER_HEIGHT);
+                
+                // Draw project title in header (left column area)
+                if (projectTitle) {
+                    ctx.fillStyle = colors.taskName;
+                    ctx.font = `bold 16px ${activeTheme.font}`;
+                    ctx.textAlign = 'left';
+                    ctx.fillText(projectTitle, 20, HEADER_HEIGHT / 2 + 6);
+                }
+                
+                // Header bottom line
+                ctx.strokeStyle = colors.gridLineStrong;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, HEADER_HEIGHT);
+                ctx.lineTo(VB_WIDTH, HEADER_HEIGHT);
+                ctx.stroke();
+                
+                // Draw tick lines and labels
+                let lastLabelEndX = VB_LEFT_WIDTH; // Track where the last label ended
+                const labelPadding = 10; // Minimum gap between labels
+                
+                ticks.forEach((tick, i) => {
+                    const x = VB_LEFT_WIDTH + (tick * PIXELS_PER_DAY);
+                    if (x > VB_WIDTH) return;
+                    
+                    // Draw grid line
+                    if (showGridLines || i === 0) {
+                        ctx.strokeStyle = i === 0 ? colors.gridLineStrong : colors.gridLine;
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash(i === 0 ? [] : [4, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(x, HEADER_HEIGHT);
+                        ctx.lineTo(x, TOTAL_HEIGHT);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                    
+                    // Draw tick label only if it doesn't overlap with previous
+                    const label = getLabel(tick);
+                    if (label) {
+                        ctx.font = `bold 12px ${activeTheme.font}`;
+                        const labelWidth = ctx.measureText(label).width;
+                        const labelStartX = x + 5;
+                        
+                        // Check if this label would overlap with the previous one
+                        if (labelStartX >= lastLabelEndX + labelPadding || i === 0) {
+                            ctx.fillStyle = colors.tickLabel;
+                            ctx.textAlign = 'left';
+                            ctx.fillText(label, labelStartX, HEADER_HEIGHT - 15);
+                            lastLabelEndX = labelStartX + labelWidth;
+                        }
+                    }
+                });
+                
+                // Draw tasks (only visible tasks - silent tasks excluded)
+                visibleTasks.forEach((task, i) => {
+                    const y = HEADER_HEIGHT + (i * ROW_HEIGHT);
+                    const barX = VB_LEFT_WIDTH + (task.startDay * PIXELS_PER_DAY);
+                    const barWidth = Math.max(task.durationInDays * PIXELS_PER_DAY, 2);
+                    const barHeight = ROW_HEIGHT - 16;
+                    const barY = y + 8;
+                    const radius = 4;
+                    
+                    // Task name
+                    ctx.fillStyle = colors.taskName;
+                    ctx.font = `500 14px ${activeTheme.font}`;
+                    ctx.textAlign = 'left';
+                    ctx.fillText(task.name, 20, y + (ROW_HEIGHT / 2) + 5);
+                    
+                    // Duration text
+                    ctx.fillStyle = colors.duration;
+                    ctx.font = `12px ${activeTheme.font}`;
+                    ctx.textAlign = 'right';
+                    ctx.fillText(task.rawDuration || '', VB_LEFT_WIDTH - 20, y + (ROW_HEIGHT / 2) + 5);
+                    
+                    // Draw bar with rounded corners
+                    ctx.fillStyle = task.color;
+                    ctx.beginPath();
+                    ctx.moveTo(barX + radius, barY);
+                    ctx.lineTo(barX + barWidth - radius, barY);
+                    ctx.quadraticCurveTo(barX + barWidth, barY, barX + barWidth, barY + radius);
+                    ctx.lineTo(barX + barWidth, barY + barHeight - radius);
+                    ctx.quadraticCurveTo(barX + barWidth, barY + barHeight, barX + barWidth - radius, barY + barHeight);
+                    ctx.lineTo(barX + radius, barY + barHeight);
+                    ctx.quadraticCurveTo(barX, barY + barHeight, barX, barY + barHeight - radius);
+                    ctx.lineTo(barX, barY + radius);
+                    ctx.quadraticCurveTo(barX, barY, barX + radius, barY);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Draw stroke for contrast theme
+                    if (activeTheme.id === 'contrast') {
+                        ctx.strokeStyle = '#000';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                    
+                    // Draw milestone star
+                    if (task.isMilestone) {
+                        const starX = barX + barWidth + 8;
+                        const starY = y + ROW_HEIGHT / 2;
+                        const starScale = 0.9;
+                        
+                        ctx.save();
+                        ctx.translate(starX, starY);
+                        ctx.scale(starScale, starScale);
+                        
+                        ctx.fillStyle = task.color;
+                        ctx.strokeStyle = colors.background;
+                        ctx.lineWidth = 1;
+                        
+                        // Draw 5-pointed star
+                        ctx.beginPath();
+                        const points = [
+                            [0, -10], [2.2, -3.1], [9.5, -3.1], [3.6, 1.2], [5.9, 8.1],
+                            [0, 3.8], [-5.9, 8.1], [-3.6, 1.2], [-9.5, -3.1], [-2.2, -3.1]
+                        ];
+                        ctx.moveTo(points[0][0], points[0][1]);
+                        for (let j = 1; j < points.length; j++) {
+                            ctx.lineTo(points[j][0], points[j][1]);
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                        
+                        ctx.restore();
+                    }
+                });
+                
+                // Left column separator line
+                ctx.strokeStyle = colors.gridLineStrong;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(VB_LEFT_WIDTH, 0);
+                ctx.lineTo(VB_LEFT_WIDTH, TOTAL_HEIGHT);
+                ctx.stroke();
+                
+            }, [processedData, projectTitle, activeTheme, showGridLines, scale, startDateStr, customColors, dateLocale]);
+            
+            // Calculate dimensions for proper sizing
+            const ROW_HEIGHT = 40;
+            const HEADER_HEIGHT = 50;
+            const visibleTaskCount = processedData.filter(t => !t.isSilent).length;
+            const maxDay = Math.max(...processedData.map(t => t.endDay), 1);
+            const TOTAL_HEIGHT = HEADER_HEIGHT + (visibleTaskCount * ROW_HEIGHT) + 40;
+            
+            return (
+                <div ref={containerRef} className="flex items-center justify-center w-full">
+                    <canvas 
+                        ref={canvasRef} 
+                        style={{
+                            borderRadius: '4px',
+                            maxWidth: '100%',
+                            height: 'auto',
+                            minHeight: '300px'
+                        }} 
+                    />
+                </div>
+            );
+        };
 
         // --- 1. THEMES CONFIGURATION ---
         const THEMES = {
@@ -241,20 +588,25 @@
             const lines = csv.split('\n').filter(l => l.trim().length > 0);
             return lines.map((line, index) => {
                 const parts = line.split(',');
+                const typeField = cleanString(parts[4]).toLowerCase();
                 return {
                     id: Date.now() + index,
                     name: cleanString(parts[0]),
                     duration: cleanString(parts[1]),
                     start: cleanString(parts[2]),
                     color: cleanString(parts[3]),
-                    isMilestone: cleanString(parts[4]).toLowerCase() === 'milestone'
+                    isMilestone: typeField === 'milestone',
+                    isSilent: typeField === 'silent'
                 };
             });
         };
 
         const tasksToCsv = (tasks) => {
             return tasks.map(t => {
-                return `${t.name},${t.duration},${t.start},${t.color},${t.isMilestone ? 'milestone' : ''}`;
+                let typeField = '';
+                if (t.isMilestone) typeField = 'milestone';
+                else if (t.isSilent) typeField = 'silent';
+                return `${t.name},${t.duration},${t.start},${t.color},${typeField}`;
             }).join('\n');
         };
 
@@ -265,31 +617,128 @@ Testing, 2w, Development
 Deployment, 1w, Testing
 Marketing Launch, 0d, Deployment, , milestone`;
 
+        // --- Local Storage Keys ---
+        const STORAGE_KEY = 'projectPlannerData';
+
+        // --- Load from Local Storage ---
+        const loadFromStorage = () => {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    return JSON.parse(saved);
+                }
+            } catch (e) {
+                console.warn('Failed to load from localStorage:', e);
+            }
+            return null;
+        };
+
+        // --- Save to Local Storage ---
+        const saveToStorage = (data) => {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.warn('Failed to save to localStorage:', e);
+            }
+        };
+
         // --- Main Component ---
 
         function ProjectPlanApp() {
+            // Load saved data on initial render
+            const savedData = useMemo(() => loadFromStorage(), []);
+
             // -- State --
             const [activeTab, setActiveTab] = useState('editor');
-            const [projectTitle, setProjectTitle] = useState('Project Timeline');
-            const [scale, setScale] = useState('weeks');
-            const [startDateStr, setStartDateStr] = useState('');
-            const [googleSheetUrl, setGoogleSheetUrl] = useState('');
-            const [showGridLines, setShowGridLines] = useState(true);
+            const [projectTitle, setProjectTitle] = useState(savedData?.projectTitle || 'Project Timeline');
+            const [customerName, setCustomerName] = useState(savedData?.customerName || '');
+            const [scale, setScale] = useState(savedData?.scale || 'weeks');
+            const [startDateStr, setStartDateStr] = useState(savedData?.startDateStr || '');
+            const [googleSheetUrl, setGoogleSheetUrl] = useState(savedData?.googleSheetUrl || '');
+            const [showGridLines, setShowGridLines] = useState(savedData?.showGridLines ?? true);
+            const [dateLocale, setDateLocale] = useState(savedData?.dateLocale || 'en');
+            
+            // Language options for date formatting
+            const LOCALE_OPTIONS = [
+                { code: 'en', name: 'English' },
+                { code: 'it', name: 'Italiano' },
+                { code: 'de', name: 'Deutsch' },
+                { code: 'es', name: 'Español' },
+                { code: 'fr', name: 'Français' },
+                { code: 'da', name: 'Dansk' },
+                { code: 'sv', name: 'Svenska' },
+                { code: 'no', name: 'Norsk' },
+                { code: 'fi', name: 'Suomi' },
+                { code: 'pt', name: 'Português' }
+            ];
             
             // View State
             const [isFullScreen, setIsFullScreen] = useState(false);
 
             // Theme State
-            const [activeTheme, setActiveTheme] = useState(THEMES.default);
-            const [selectedThemeId, setSelectedThemeId] = useState('default');
+            const initialTheme = savedData?.selectedThemeId && THEMES[savedData.selectedThemeId] 
+                ? THEMES[savedData.selectedThemeId] 
+                : (savedData?.activeTheme || THEMES.default);
+            const [activeTheme, setActiveTheme] = useState(initialTheme);
+            const [selectedThemeId, setSelectedThemeId] = useState(savedData?.selectedThemeId || 'default');
             const [showCssEditor, setShowCssEditor] = useState(false);
             const [jsonError, setJsonError] = useState(null);
-            const [themeJson, setThemeJson] = useState(JSON.stringify(THEMES.default, null, 2));
+            const [themeJson, setThemeJson] = useState(JSON.stringify(initialTheme, null, 2));
 
             // Editor State
             const [editorMode, setEditorMode] = useState('grid');
-            const [tasks, setTasks] = useState(csvToTasks(DEFAULT_CSV));
-            const [textBuffer, setTextBuffer] = useState(DEFAULT_CSV);
+            const initialTasks = savedData?.tasks ? savedData.tasks : csvToTasks(DEFAULT_CSV);
+            const [tasks, setTasks] = useState(initialTasks);
+            const [textBuffer, setTextBuffer] = useState(savedData?.textBuffer || tasksToCsv(initialTasks));
+            const [focusedTaskIndex, setFocusedTaskIndex] = useState(-1);
+
+            // Custom Colors State
+            const [customColors, setCustomColors] = useState(savedData?.customColors || {
+                background: '',
+                taskName: '',
+                duration: '',
+                gridLine: '',
+                gridLineStrong: '',
+                headerBg: '',
+                rowAlt: '',
+                tickLabel: ''
+            });
+
+            const updateCustomColor = (key, value) => {
+                setCustomColors(prev => ({ ...prev, [key]: value }));
+            };
+
+            const resetCustomColors = () => {
+                setCustomColors({
+                    background: '',
+                    taskName: '',
+                    duration: '',
+                    gridLine: '',
+                    gridLineStrong: '',
+                    headerBg: '',
+                    rowAlt: '',
+                    tickLabel: ''
+                });
+            };
+
+            // -- Auto-save to localStorage whenever state changes --
+            useEffect(() => {
+                const dataToSave = {
+                    projectTitle,
+                    customerName,
+                    scale,
+                    startDateStr,
+                    googleSheetUrl,
+                    showGridLines,
+                    dateLocale,
+                    selectedThemeId,
+                    activeTheme: selectedThemeId === 'custom' ? activeTheme : null,
+                    tasks,
+                    textBuffer,
+                    customColors
+                };
+                saveToStorage(dataToSave);
+            }, [projectTitle, customerName, scale, startDateStr, googleSheetUrl, showGridLines, dateLocale, selectedThemeId, activeTheme, tasks, textBuffer, customColors]);
             
             const chartRef = useRef(null);
 
@@ -337,7 +786,34 @@ Marketing Launch, 0d, Deployment, , milestone`;
             };
 
             const addTask = () => {
-                setTasks([...tasks, { id: Date.now(), name: 'New Task', duration: '1w', start: '', color: '', isMilestone: false }]);
+                const newTask = { id: Date.now(), name: 'New Task', duration: '1w', start: '', color: '', isMilestone: false, isSilent: false };
+                if (focusedTaskIndex >= 0 && focusedTaskIndex < tasks.length) {
+                    // Insert after the focused task
+                    const newTasks = [...tasks];
+                    newTasks.splice(focusedTaskIndex + 1, 0, newTask);
+                    setTasks(newTasks);
+                    setFocusedTaskIndex(focusedTaskIndex + 1);
+                } else {
+                    // Add at the end
+                    setTasks([...tasks, newTask]);
+                    setFocusedTaskIndex(tasks.length);
+                }
+            };
+
+            const moveTaskUp = (index) => {
+                if (index <= 0) return;
+                const newTasks = [...tasks];
+                [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
+                setTasks(newTasks);
+                setFocusedTaskIndex(index - 1);
+            };
+
+            const moveTaskDown = (index) => {
+                if (index >= tasks.length - 1) return;
+                const newTasks = [...tasks];
+                [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
+                setTasks(newTasks);
+                setFocusedTaskIndex(index + 1);
             };
 
             const removeTask = (index) => {
@@ -368,6 +844,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                         durationInDays,
                         startRef: t.start,
                         isMilestone: t.isMilestone,
+                        isSilent: t.isSilent,
                         startDay: 0,
                         endDay: 0,
                         color: resolvedColor
@@ -459,94 +936,119 @@ Marketing Launch, 0d, Deployment, , milestone`;
 
             // -- JPEG Download --
             const downloadJpeg = () => {
-                const svg = chartRef.current;
-                if (!svg) return;
+                const canvas = chartRef.current;
+                if (!canvas) return;
 
-                const svgData = new XMLSerializer().serializeToString(svg);
-                const canvas = document.createElement("canvas");
-                const ctx = canvas.getContext("2d");
-                
-                const bbox = svg.getBoundingClientRect();
-                const width = bbox.width * 2; 
-                const height = bbox.height * 2;
-                
-                canvas.width = width;
-                canvas.height = height;
-                
-                const img = new Image();
-                const svgBlob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
-                const url = URL.createObjectURL(svgBlob);
-                
-                img.onload = () => {
-                    ctx.fillStyle = activeTheme.bg;
-                    ctx.fillRect(0, 0, width, height);
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    const jpegUrl = canvas.toDataURL("image/jpeg", 0.9);
-                    const link = document.createElement("a");
-                    link.href = jpegUrl;
-                    link.download = `${projectTitle.replace(/\s+/g, '_').toLowerCase()}.jpg`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
+                const jpegUrl = canvas.toDataURL("image/jpeg", 0.95);
+                const link = document.createElement("a");
+                link.href = jpegUrl;
+                link.download = `${projectTitle.replace(/\s+/g, '_').toLowerCase()}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             };
 
-            // -- Chart Dimensions --
-            const maxDay = Math.max(...processedData.map(t => t.endDay), 1);
-            const totalDays = maxDay * 1.05; 
+            // -- Copy to Clipboard --
+            const [copyStatus, setCopyStatus] = useState('');
             
-            const getLabel = (dayIndex) => {
-                if (startDateStr) {
-                    // Custom logic for Months scale to ensure we show consecutive months 
-                    // (Jan, Feb, Mar) instead of drifting due to 30-day fixed intervals (Jan, Mar).
-                    if (scale === 'months') {
-                        const date = new Date(startDateStr);
-                        // Using round ensures we snap to the closest logical month block
-                        const monthShift = Math.round(dayIndex / 30);
-                        date.setMonth(date.getMonth() + monthShift);
-                        // Format: "Jan", "Feb" etc.
-                        return date.toLocaleDateString(undefined, { month: 'short' });
-                    }
+            const copyToClipboard = async () => {
+                const canvas = chartRef.current;
+                if (!canvas) return;
 
-                    const date = new Date(startDateStr);
-                    date.setDate(date.getDate() + dayIndex);
-                    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                try {
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    setCopyStatus('copied');
+                    setTimeout(() => setCopyStatus(''), 2000);
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                    setCopyStatus('error');
+                    setTimeout(() => setCopyStatus(''), 2000);
                 }
-                if (scale === 'weeks') {
-                    const weekNum = Math.floor(dayIndex / 7) + 1;
-                    if (dayIndex % 7 === 0) return `W${weekNum}`;
-                    return ''; 
-                }
-                if (scale === 'months') {
-                    const monthNum = Math.floor(dayIndex / 30) + 1;
-                    if (dayIndex % 30 === 0) return `M${monthNum}`;
-                    return '';
-                }
-                return dayIndex;
             };
 
-            const ROW_HEIGHT = 40;
-            const HEADER_HEIGHT = 50;
-            const LEFT_COL_WIDTH_PCT = 25; 
-            const CHART_WIDTH_PCT = 75; 
-            const VB_WIDTH = 1000;
-            const VB_LEFT_WIDTH = VB_WIDTH * (LEFT_COL_WIDTH_PCT / 100);
-            const VB_CHART_WIDTH = VB_WIDTH * (CHART_WIDTH_PCT / 100);
-            const PIXELS_PER_DAY = VB_CHART_WIDTH / (totalDays || 1);
-            const TOTAL_HEIGHT = HEADER_HEIGHT + (processedData.length * ROW_HEIGHT) + 40;
+            // -- JSON File Save/Load --
+            const fileInputRef = useRef(null);
 
-            const ticks = [];
-            let tickInterval = 1;
-            if (scale === 'weeks') tickInterval = 7;
-            if (scale === 'months') tickInterval = 30;
-            const estTickCount = totalDays / tickInterval;
-            if (estTickCount > 20) tickInterval *= 2; 
-            for (let i = 0; i <= totalDays; i += tickInterval) {
-                ticks.push(i);
-            }
+            const saveProjectJson = () => {
+                const dataToSave = {
+                    projectTitle,
+                    customerName,
+                    scale,
+                    startDateStr,
+                    googleSheetUrl,
+                    showGridLines,
+                    dateLocale,
+                    selectedThemeId,
+                    activeTheme: selectedThemeId === 'custom' ? activeTheme : null,
+                    tasks,
+                    textBuffer,
+                    customColors
+                };
+                const jsonStr = JSON.stringify(dataToSave, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                // Format: customer_project_YYYYMMDD_HHMMSS.json
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+                const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+                const customerPart = customerName.trim() ? customerName.trim().replace(/\s+/g, '_').toLowerCase() + '_' : '';
+                const projectPart = projectTitle.replace(/\s+/g, '_').toLowerCase();
+                link.download = `${customerPart}${projectPart}_${dateStr}_${timeStr}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            };
+
+            const loadProjectJson = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        
+                        // Restore all state from the loaded data
+                        if (data.projectTitle) setProjectTitle(data.projectTitle);
+                        if (data.customerName !== undefined) setCustomerName(data.customerName);
+                        if (data.scale) setScale(data.scale);
+                        if (data.startDateStr !== undefined) setStartDateStr(data.startDateStr);
+                        if (data.googleSheetUrl !== undefined) setGoogleSheetUrl(data.googleSheetUrl);
+                        if (data.showGridLines !== undefined) setShowGridLines(data.showGridLines);
+                        if (data.dateLocale) setDateLocale(data.dateLocale);
+                        if (data.selectedThemeId) {
+                            setSelectedThemeId(data.selectedThemeId);
+                            if (THEMES[data.selectedThemeId]) {
+                                setActiveTheme(THEMES[data.selectedThemeId]);
+                                setThemeJson(JSON.stringify(THEMES[data.selectedThemeId], null, 2));
+                            } else if (data.activeTheme) {
+                                setActiveTheme(data.activeTheme);
+                                setThemeJson(JSON.stringify(data.activeTheme, null, 2));
+                            }
+                        }
+                        if (data.tasks) {
+                            setTasks(data.tasks);
+                            setTextBuffer(tasksToCsv(data.tasks));
+                        }
+                        if (data.customColors) setCustomColors(data.customColors);
+                        
+                        alert('Project loaded successfully!');
+                    } catch (err) {
+                        alert('Failed to load project: Invalid JSON file');
+                        console.error(err);
+                    }
+                };
+                reader.readAsText(file);
+                
+                // Reset file input so the same file can be loaded again
+                event.target.value = '';
+            };
 
             return (
                 <div className="flex flex-col h-screen bg-gray-50 text-gray-800 font-sans">
@@ -580,6 +1082,25 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                 <Maximize className="w-5 h-5" />
                             </button>
                             <button 
+                                onClick={copyToClipboard}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-sm ${
+                                    copyStatus === 'copied' 
+                                        ? 'bg-green-600 text-white' 
+                                        : copyStatus === 'error'
+                                            ? 'bg-red-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                                title="Copy to Clipboard"
+                            >
+                                {copyStatus === 'copied' ? (
+                                    <><Check className="w-4 h-4" /> Copied!</>
+                                ) : copyStatus === 'error' ? (
+                                    <>Failed</>
+                                ) : (
+                                    <><Copy className="w-4 h-4" /> Copy</>
+                                )}
+                            </button>
+                            <button 
                                 onClick={downloadJpeg}
                                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
                             >
@@ -605,6 +1126,14 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Customer</label>
+                                        <input 
+                                            type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+                                            placeholder="Used for filename only"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        />
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1">Scale</label>
@@ -627,6 +1156,17 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                             />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Month Language</label>
+                                        <select 
+                                            value={dateLocale} onChange={(e) => setDateLocale(e.target.value)}
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                        >
+                                            {LOCALE_OPTIONS.map(loc => (
+                                                <option key={loc.code} value={loc.code}>{loc.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-gray-700">
                                         <input 
@@ -678,6 +1218,39 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                             className={`w-full h-48 font-mono text-xs p-2 border rounded-md outline-none resize-y ${jsonError ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-indigo-500'}`}
                                         />
                                     )}
+
+                                    {/* Custom Colors */}
+                                    <div className="mt-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-medium text-gray-600">Custom Colors</span>
+                                            <button 
+                                                onClick={resetCustomColors}
+                                                className="text-xs text-gray-400 hover:text-gray-600"
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[
+                                                { key: 'background', label: 'Background', fallback: activeTheme.bg },
+                                                { key: 'taskName', label: 'Task Names', fallback: activeTheme.text },
+                                                { key: 'duration', label: 'Duration', fallback: activeTheme.textSecondary },
+                                                { key: 'gridLine', label: 'Grid Lines', fallback: activeTheme.gridLine }
+                                            ].map(({ key, label, fallback }) => (
+                                                <div key={key} className="flex items-center gap-2">
+                                                    <div className="relative w-6 h-6 rounded border border-gray-300 overflow-hidden shrink-0">
+                                                        <input 
+                                                            type="color" 
+                                                            value={customColors[key] || fallback}
+                                                            onChange={(e) => updateCustomColor(key, e.target.value)}
+                                                            className="absolute -top-1 -left-1 w-8 h-8 p-0 border-0 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs text-gray-600 truncate">{label}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <hr className="border-gray-100" />
@@ -701,20 +1274,23 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                             <table className="w-full text-sm border-collapse">
                                                 <thead>
                                                     <tr className="text-xs text-gray-500 border-b border-gray-200">
-                                                        <th className="text-left font-medium p-2 w-[35%]">Task Name</th>
-                                                        <th className="text-left font-medium p-2 w-[15%]">Dur.</th>
-                                                        <th className="text-left font-medium p-2 w-[25%]">Start/Dep</th>
-                                                        <th className="text-center font-medium p-2 w-[15%]">Color</th>
-                                                        <th className="text-center font-medium p-2 w-[5%]"><Check className="w-3 h-3 mx-auto"/></th>
-                                                        <th className="w-[5%]"></th>
+                                                        <th className="text-left font-medium p-2 w-[28%]">Task Name</th>
+                                                        <th className="text-left font-medium p-2 w-[10%]">Dur.</th>
+                                                        <th className="text-left font-medium p-2 w-[18%]">Start/Dep</th>
+                                                        <th className="text-center font-medium p-2 w-[12%]">Color</th>
+                                                        <th className="text-center font-medium p-2 w-[5%]" title="Milestone"><Check className="w-3 h-3 mx-auto"/></th>
+                                                        <th className="text-center font-medium p-2 w-[5%]" title="Silent">👁</th>
+                                                        <th className="text-center font-medium p-2 w-[8%]" title="Reorder">↕</th>
+                                                        <th className="w-[4%]"></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {tasks.map((task, idx) => (
-                                                        <tr key={task.id} className="group hover:bg-white transition-colors">
+                                                        <tr key={task.id} className={`group hover:bg-white transition-colors ${focusedTaskIndex === idx ? 'bg-indigo-50' : ''}`}>
                                                             <td className="p-1">
                                                                 <input 
                                                                     type="text" value={task.name} onChange={(e) => updateTask(idx, 'name', e.target.value)}
+                                                                    onFocus={() => setFocusedTaskIndex(idx)}
                                                                     className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-800"
                                                                     placeholder="Task Name"
                                                                 />
@@ -722,6 +1298,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                                             <td className="p-1">
                                                                 <input 
                                                                     type="text" value={task.duration} onChange={(e) => updateTask(idx, 'duration', e.target.value)}
+                                                                    onFocus={() => setFocusedTaskIndex(idx)}
                                                                     className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-600"
                                                                     placeholder="1w"
                                                                 />
@@ -729,6 +1306,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                                             <td className="p-1">
                                                                 <input 
                                                                     type="text" value={task.start} onChange={(e) => updateTask(idx, 'start', e.target.value)}
+                                                                    onFocus={() => setFocusedTaskIndex(idx)}
                                                                     className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-600"
                                                                     placeholder="Start..."
                                                                 />
@@ -754,7 +1332,35 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                                                 <input 
                                                                     type="checkbox" checked={task.isMilestone} onChange={(e) => updateTask(idx, 'isMilestone', e.target.checked)}
                                                                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                    title="Milestone"
                                                                 />
+                                                            </td>
+                                                            <td className="p-1 text-center">
+                                                                <input 
+                                                                    type="checkbox" checked={task.isSilent} onChange={(e) => updateTask(idx, 'isSilent', e.target.checked)}
+                                                                    className="rounded border-gray-300 text-gray-400 focus:ring-gray-400 cursor-pointer"
+                                                                    title="Silent (hidden in chart)"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 text-center">
+                                                                <div className="flex items-center justify-center gap-0.5">
+                                                                    <button 
+                                                                        onClick={() => moveTaskUp(idx)} 
+                                                                        disabled={idx === 0}
+                                                                        className={`p-0.5 rounded ${idx === 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                                                        title="Move up"
+                                                                    >
+                                                                        <ChevronUp className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => moveTaskDown(idx)} 
+                                                                        disabled={idx === tasks.length - 1}
+                                                                        className={`p-0.5 rounded ${idx === tasks.length - 1 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                                                        title="Move down"
+                                                                    >
+                                                                        <ChevronDown className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                             <td className="p-1 text-center">
                                                                 <button onClick={() => removeTask(idx)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50">
@@ -771,7 +1377,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                         </div>
                                     ) : (
                                         <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
-                                            <p className="text-xs text-gray-500 mb-2">CSV Format: Name, Duration, Start, Color, Type</p>
+                                            <p className="text-xs text-gray-500 mb-2">CSV Format: Name, Duration, Start, Color, Type (milestone/silent)</p>
                                             <textarea 
                                                 value={textBuffer} onChange={(e) => setTextBuffer(e.target.value)}
                                                 className="w-full h-64 font-mono text-sm bg-white border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none whitespace-pre"
@@ -785,7 +1391,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                 {/* Google Sheets */}
                                 <div className="space-y-4">
                                     <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
-                                        <FileSpreadsheet className="w-4 h-4" /> Import
+                                        <FileSpreadsheet className="w-4 h-4" /> Import from Sheets
                                     </h2>
                                     <div className="flex gap-2">
                                         <input 
@@ -796,6 +1402,36 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                         <button onClick={fetchGoogleSheet} className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700">
                                             <RefreshCw className="w-4 h-4" />
                                         </button>
+                                    </div>
+                                </div>
+
+                                <hr className="border-gray-100" />
+
+                                {/* Save/Load Project */}
+                                <div className="space-y-4">
+                                    <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
+                                        <Save className="w-4 h-4" /> Project File
+                                    </h2>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={saveProjectJson}
+                                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                        >
+                                            <Download className="w-4 h-4" /> Save Project
+                                        </button>
+                                        <button 
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
+                                        >
+                                            <Upload className="w-4 h-4" /> Load Project
+                                        </button>
+                                        <input 
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".json"
+                                            onChange={loadProjectJson}
+                                            className="hidden"
+                                        />
                                     </div>
                                 </div>
 
@@ -832,119 +1468,18 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                     {processedData.length === 0 ? (
                                         <div className="h-64 flex items-center justify-center text-gray-400">No tasks to display</div>
                                     ) : (
-                                        <svg 
-                                            ref={chartRef}
-                                            viewBox={`0 0 ${VB_WIDTH} ${TOTAL_HEIGHT}`} 
-                                            preserveAspectRatio="none"
-                                            className={`w-full block shadow-sm ${isFullScreen ? 'h-full max-h-none' : 'h-auto max-h-[80vh]'}`}
-                                            style={{ 
-                                                minHeight: '300px', 
-                                                backgroundColor: activeTheme.bg,
-                                                fontFamily: activeTheme.font
-                                            }}
-                                        >
-                                            <rect x="0" y="0" width={VB_WIDTH} height={TOTAL_HEIGHT} fill={activeTheme.bg} />
-                                            
-                                            {processedData.map((task, i) => {
-                                                const y = HEADER_HEIGHT + (i * ROW_HEIGHT);
-                                                return (
-                                                    <rect 
-                                                        key={`bg-${task.id}`}
-                                                        x="0" y={y} 
-                                                        width={VB_WIDTH} height={ROW_HEIGHT} 
-                                                        fill={i % 2 === 0 ? activeTheme.bg : activeTheme.rowAlt} 
-                                                    />
-                                                );
-                                            })}
-                                            
-                                            <rect x="0" y="0" width={VB_WIDTH} height={HEADER_HEIGHT} fill={activeTheme.headerBg} />
-                                            <line x1="0" y1={HEADER_HEIGHT} x2={VB_WIDTH} y2={HEADER_HEIGHT} stroke={activeTheme.gridLineStrong} strokeWidth="2" />
-
-                                            {ticks.map((tick, i) => {
-                                                const x = VB_LEFT_WIDTH + (tick * PIXELS_PER_DAY);
-                                                if (x > VB_WIDTH) return null;
-                                                
-                                                return (
-                                                    <g key={`tick-${i}`}>
-                                                        {(showGridLines || i === 0) && (
-                                                            <line 
-                                                                x1={x} y1={HEADER_HEIGHT} 
-                                                                x2={x} y2={TOTAL_HEIGHT} 
-                                                                stroke={i === 0 ? activeTheme.gridLineStrong : activeTheme.gridLine} 
-                                                                strokeDasharray={i === 0 ? "" : "4 4"}
-                                                            />
-                                                        )}
-                                                        <text 
-                                                            x={x + 5} 
-                                                            y={HEADER_HEIGHT - 15} 
-                                                            fill={activeTheme.textSecondary}
-                                                            style={{ fontSize: '12px', fontFamily: activeTheme.font, fontWeight: 'bold' }}
-                                                        >
-                                                            {getLabel(tick)}
-                                                        </text>
-                                                    </g>
-                                                );
-                                            })}
-
-                                            {processedData.map((task, i) => {
-                                                const y = HEADER_HEIGHT + (i * ROW_HEIGHT);
-                                                const barX = VB_LEFT_WIDTH + (task.startDay * PIXELS_PER_DAY);
-                                                const barWidth = Math.max(task.durationInDays * PIXELS_PER_DAY, 2);
-
-                                                return (
-                                                    <g key={task.id}>
-                                                        <text 
-                                                            x="20" 
-                                                            y={y + (ROW_HEIGHT / 2) + 5} 
-                                                            fill={activeTheme.text}
-                                                            style={{ fontSize: '14px', fontFamily: activeTheme.font, fontWeight: '500' }}
-                                                        >
-                                                            {task.name}
-                                                        </text>
-                                                        
-                                                        <text 
-                                                            x={VB_LEFT_WIDTH - 20} 
-                                                            y={y + (ROW_HEIGHT / 2) + 5} 
-                                                            textAnchor="end"
-                                                            fill={activeTheme.textSecondary}
-                                                            style={{ fontSize: '12px', fontFamily: activeTheme.font }}
-                                                        >
-                                                            {task.rawDuration}
-                                                        </text>
-
-                                                        <rect 
-                                                            x={barX} 
-                                                            y={y + 8} 
-                                                            width={barWidth} 
-                                                            height={ROW_HEIGHT - 16} 
-                                                            fill={task.color} 
-                                                            rx="4"
-                                                            stroke={activeTheme.id === 'contrast' ? '#000' : 'none'}
-                                                            strokeWidth={activeTheme.id === 'contrast' ? 1 : 0}
-                                                        />
-
-                                                        {task.isMilestone && (
-                                                            <g transform={`translate(${barX + barWidth + 8}, ${y + ROW_HEIGHT/2}) scale(0.9)`}>
-                                                                <polygon 
-                                                                    points="0,-10 2.2,-3.1 9.5,-3.1 3.6,1.2 5.9,8.1 0,3.8 -5.9,8.1 -3.6,1.2 -9.5,-3.1 -2.2,-3.1"
-                                                                    fill={task.color}
-                                                                    stroke={activeTheme.bg} 
-                                                                    strokeWidth="1"
-                                                                />
-                                                            </g>
-                                                        )}
-                                                    </g>
-                                                );
-                                            })}
-                                            
-                                            <line 
-                                                x1={VB_LEFT_WIDTH} y1="0" 
-                                                x2={VB_LEFT_WIDTH} y2={TOTAL_HEIGHT} 
-                                                stroke={activeTheme.gridLineStrong} 
-                                                strokeWidth="2" 
-                                            />
-
-                                        </svg>
+                                        <CanvasGanttChart
+                                            processedData={processedData}
+                                            projectTitle={projectTitle}
+                                            activeTheme={activeTheme}
+                                            showGridLines={showGridLines}
+                                            scale={scale}
+                                            startDateStr={startDateStr}
+                                            canvasRef={chartRef}
+                                            isFullScreen={isFullScreen}
+                                            customColors={customColors}
+                                            dateLocale={dateLocale}
+                                        />
                                     )}
                                 </div>
                             </div>
