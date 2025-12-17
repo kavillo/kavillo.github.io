@@ -66,6 +66,15 @@
         /* Hide color input default UI */
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+        
+        /* Toast animation */
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fade-in 0.2s ease-out;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 h-screen overflow-hidden">
@@ -301,6 +310,30 @@
         );
         const X = ({ size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        );
+        const HelpCircle = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        );
+        const Undo = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        );
+        const Redo = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+        );
+        const ChevronUp = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m18 15-6-6-6 6"/></svg>
+        );
+        const ChevronDown = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
+        );
+        const Clipboard = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+        );
+        const Save = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        );
+        const FolderOpen = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
         );
 
 
@@ -626,7 +659,7 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
         };
 
         // --- COMPONENT: Spreadsheet Editor ---
-        const SpreadsheetEditor = ({ data, onUpdate }) => {
+        const SpreadsheetEditor = ({ data, onUpdate, onMoveRow }) => {
             const [rows, setRows] = useState([]);
 
             useEffect(() => {
@@ -717,9 +750,25 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
                                         />
                                     </div>
                                 ))}
-                                <div className="sheet-cell flex justify-center items-center">
-                                    <button onClick={() => removeRow(rIdx + 1)} className="text-red-500 hover:text-red-400 p-1 rounded hover:bg-slate-800">
-                                        <X size={14} />
+                                <div className="sheet-cell flex justify-center items-center gap-1">
+                                    <button 
+                                        onClick={() => onMoveRow && onMoveRow(rIdx + 1, 'up')} 
+                                        disabled={rIdx === 0}
+                                        className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Move up"
+                                    >
+                                        <ChevronUp size={12} />
+                                    </button>
+                                    <button 
+                                        onClick={() => onMoveRow && onMoveRow(rIdx + 1, 'down')} 
+                                        disabled={rIdx === rows.length - 2}
+                                        className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Move down"
+                                    >
+                                        <ChevronDown size={12} />
+                                    </button>
+                                    <button onClick={() => removeRow(rIdx + 1)} className="text-red-500 hover:text-red-400 p-0.5 rounded hover:bg-slate-800">
+                                        <X size={12} />
                                     </button>
                                 </div>
                             </React.Fragment>
@@ -842,6 +891,95 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
             },
         };
 
+        // --- Toast Component ---
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+            
+            const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+            
+            return (
+                <div className={`fixed bottom-6 right-6 ${bgColor} text-white px-6 py-3 rounded-lg shadow-xl z-[100] flex items-center gap-3 animate-fade-in`}>
+                    <span>{message}</span>
+                    <button onClick={onClose} className="hover:opacity-70">
+                        <X size={16} />
+                    </button>
+                </div>
+            );
+        };
+
+        // --- Help Modal Component ---
+        const HelpModal = ({ onClose }) => (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+                <div 
+                    className="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl border border-slate-600"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center p-4 border-b border-slate-700">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <HelpCircle size={20} className="text-blue-400" />
+                            Chart Generator Help
+                        </h2>
+                        <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
+                            <X size={20} />
+                        </button>
+                    </div>
+                    <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)] space-y-6 text-slate-300">
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Quick Start</h3>
+                            <ol className="list-decimal list-inside space-y-1 text-sm">
+                                <li>Enter your chart title at the top</li>
+                                <li>Edit data in the grid or paste CSV in raw mode</li>
+                                <li>Customize colors in the CSS Styling tab</li>
+                                <li>Download as JPG or copy to clipboard</li>
+                            </ol>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Data Format (CSV)</h3>
+                            <div className="bg-slate-900 p-3 rounded font-mono text-xs">
+                                Label,Color,2022,2023,2024<br/>
+                                Revenue,#3baef9,14.0,14.1,14.4<br/>
+                                EBITA,#8b95f6,3.1,2.5,1.9
+                            </div>
+                            <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+                                <li><strong>Label:</strong> Series name (use ## prefix for stacked bars)</li>
+                                <li><strong>Color:</strong> Hex color code for the bar</li>
+                                <li><strong>Values:</strong> One column per category</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Google Sheets Import</h3>
+                            <ol className="list-decimal list-inside space-y-1 text-sm">
+                                <li>Create a Google Sheet with the same format</li>
+                                <li>Set sharing to "Anyone with the link can view"</li>
+                                <li>Paste the URL and click Fetch</li>
+                            </ol>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Stacked Bars</h3>
+                            <p className="text-sm">To create stacked bars, prefix the label with <code className="bg-slate-700 px-1 rounded">##</code>. 
+                            The row will stack on top of the previous bar.</p>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Keyboard Shortcuts</h3>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div><kbd className="bg-slate-700 px-2 py-0.5 rounded">⌘/Ctrl + Z</kbd></div>
+                                <div>Undo</div>
+                                <div><kbd className="bg-slate-700 px-2 py-0.5 rounded">⌘/Ctrl + Shift + Z</kbd></div>
+                                <div>Redo</div>
+                            </div>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Theme Presets</h3>
+                            <p className="text-sm">Choose from multiple themes in the CSS Styling tab. Each theme automatically adjusts all chart colors.</p>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        );
+
         function App() {
             const [rawData, setRawData] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEYS.rawData);
@@ -872,6 +1010,59 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
                 return saved !== null ? saved : 'Default Dark';
             });
             const canvasRef = useRef(null);
+            
+            // --- Toast State ---
+            const [toast, setToast] = useState(null);
+            const showToast = useCallback((message, type = 'success') => {
+                setToast({ message, type });
+            }, []);
+            
+            // --- Help Modal State ---
+            const [showHelp, setShowHelp] = useState(false);
+            
+            // --- Undo/Redo History ---
+            const [dataHistory, setDataHistory] = useState([]);
+            const [dataFuture, setDataFuture] = useState([]);
+            
+            const setRawDataWithHistory = useCallback((newData) => {
+                setDataHistory(prev => [...prev.slice(-49), rawData]);
+                setDataFuture([]);
+                setRawData(newData);
+            }, [rawData]);
+            
+            const handleUndo = useCallback(() => {
+                if (dataHistory.length === 0) return;
+                const previous = dataHistory[dataHistory.length - 1];
+                setDataHistory(prev => prev.slice(0, -1));
+                setDataFuture(prev => [rawData, ...prev]);
+                setRawData(previous);
+                showToast('Undo successful');
+            }, [dataHistory, rawData, showToast]);
+            
+            const handleRedo = useCallback(() => {
+                if (dataFuture.length === 0) return;
+                const next = dataFuture[0];
+                setDataFuture(prev => prev.slice(1));
+                setDataHistory(prev => [...prev, rawData]);
+                setRawData(next);
+                showToast('Redo successful');
+            }, [dataFuture, rawData, showToast]);
+            
+            // Keyboard shortcuts for undo/redo
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            handleRedo();
+                        } else {
+                            handleUndo();
+                        }
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [handleUndo, handleRedo]);
 
             // --- Chart Color States ---
             const [chartColors, setChartColors] = useState(() => {
@@ -955,7 +1146,7 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
             // --- Download Logic ---
             const handleDownloadJpg = () => {
                 if (!canvasRef.current) {
-                    alert("Chart not ready.");
+                    showToast("Chart not ready.", "error");
                     return;
                 }
                 
@@ -965,10 +1156,109 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
                     link.download = `${chartTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'chart'}.jpg`;
                     link.href = dataUrl;
                     link.click();
+                    showToast('Chart downloaded successfully!');
                 } catch (e) {
                     console.error("Download failed", e);
-                    alert("Failed to generate image.");
+                    showToast("Failed to generate image.", "error");
                 }
+            };
+            
+            // --- Copy to Clipboard Logic ---
+            const handleCopyToClipboard = async () => {
+                if (!canvasRef.current) {
+                    showToast("Chart not ready.", "error");
+                    return;
+                }
+                
+                try {
+                    const canvas = canvasRef.current;
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    showToast('Chart copied to clipboard!');
+                } catch (e) {
+                    console.error("Copy failed", e);
+                    showToast("Failed to copy to clipboard.", "error");
+                }
+            };
+            
+            // --- Move Row Logic ---
+            const handleMoveRow = useCallback((rowIndex, direction) => {
+                const rows = parseCSV(rawData);
+                if (direction === 'up' && rowIndex > 1) {
+                    const temp = rows[rowIndex];
+                    rows[rowIndex] = rows[rowIndex - 1];
+                    rows[rowIndex - 1] = temp;
+                } else if (direction === 'down' && rowIndex < rows.length - 1) {
+                    const temp = rows[rowIndex];
+                    rows[rowIndex] = rows[rowIndex + 1];
+                    rows[rowIndex + 1] = temp;
+                }
+                setRawDataWithHistory(toCSV(rows));
+            }, [rawData, setRawDataWithHistory]);
+            
+            // --- File input ref for loading ---
+            const fileInputRef = useRef(null);
+            
+            // --- Save to JSON File ---
+            const handleSaveToFile = () => {
+                const projectData = {
+                    version: 1,
+                    chartTitle,
+                    rawData,
+                    chartColors,
+                    selectedTheme,
+                    cssCode,
+                };
+                const json = JSON.stringify(projectData, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+                const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+                const safeName = chartTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'chart';
+                link.download = `${safeName}_${dateStr}_${timeStr}.json`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+                showToast('Chart saved to file!');
+            };
+            
+            // --- Load from JSON File ---
+            const handleLoadFromFile = (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.rawData) {
+                            setRawDataWithHistory(data.rawData);
+                        }
+                        if (data.chartTitle) {
+                            setChartTitle(data.chartTitle);
+                        }
+                        if (data.chartColors) {
+                            setChartColors(data.chartColors);
+                        }
+                        if (data.selectedTheme) {
+                            setSelectedTheme(data.selectedTheme);
+                        }
+                        if (data.cssCode) {
+                            setCssCode(data.cssCode);
+                        }
+                        showToast('Chart loaded successfully!');
+                    } catch (err) {
+                        console.error('Failed to parse JSON:', err);
+                        showToast('Failed to load file. Invalid format.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+                // Reset file input so same file can be loaded again
+                event.target.value = '';
             };
 
             // --- Parser Logic (Comma Separated) ---
@@ -1043,25 +1333,91 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
             return (
                 <div className="flex flex-col h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
                     
+                    {/* Toast Notification */}
+                    {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+                    
+                    {/* Help Modal */}
+                    {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+                    
                     {/* Header */}
                     {!isFullScreen && (
-                    <header className="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center shrink-0">
+                    <header className="bg-slate-800 border-b border-slate-700 p-3 md:p-4 flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-2">
                             <BarChart3 className="text-blue-400" />
-                            <h1 className="font-bold text-lg">Chart Generator</h1>
+                            <h1 className="font-bold text-lg hidden sm:block">Chart Generator</h1>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 md:gap-2">
+                            {/* Undo/Redo */}
+                            <button 
+                                onClick={handleUndo}
+                                disabled={dataHistory.length === 0}
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white p-2 md:px-3 md:py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Undo (⌘Z)"
+                            >
+                                <Undo size={16} />
+                            </button>
+                            <button 
+                                onClick={handleRedo}
+                                disabled={dataFuture.length === 0}
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white p-2 md:px-3 md:py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Redo (⌘⇧Z)"
+                            >
+                                <Redo size={16} />
+                            </button>
+                            <div className="w-px bg-slate-600 mx-1 hidden md:block"></div>
+                            {/* Help */}
+                            <button 
+                                onClick={() => setShowHelp(true)}
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white p-2 md:px-3 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Help"
+                            >
+                                <HelpCircle size={16} />
+                            </button>
                             <button 
                                 onClick={() => setIsFullScreen(true)}
-                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Full Screen"
                             >
-                                <Maximize size={16} /> Full Screen
+                                <Maximize size={16} /> <span className="hidden md:inline">Full Screen</span>
+                            </button>
+                            <div className="w-px bg-slate-600 mx-1 hidden md:block"></div>
+                            {/* Save/Load */}
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Load from File"
+                            >
+                                <FolderOpen size={16} /> <span className="hidden md:inline">Load</span>
+                            </button>
+                            <input 
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".json"
+                                onChange={handleLoadFromFile}
+                                className="hidden"
+                            />
+                            <button 
+                                onClick={handleSaveToFile}
+                                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Save to File"
+                            >
+                                <Save size={16} /> <span className="hidden md:inline">Save</span>
+                            </button>
+                            <div className="w-px bg-slate-600 mx-1 hidden md:block"></div>
+                            {/* Copy & Download */}
+                            <button 
+                                onClick={handleCopyToClipboard}
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Copy to Clipboard"
+                            >
+                                <Clipboard size={16} /> <span className="hidden md:inline">Copy</span>
                             </button>
                             <button 
                                 onClick={handleDownloadJpg}
-                                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Download JPG"
                             >
-                                <Download size={16} /> Download JPG
+                                <Download size={16} /> <span className="hidden md:inline">Download JPG</span>
                             </button>
                         </div>
                     </header>
@@ -1149,11 +1505,11 @@ EBITA,#8b95f6,3.1,2.5,1.9,1.1`;
                                                 <textarea 
                                                     className="flex-1 w-full bg-slate-900 border border-slate-700 rounded p-3 font-mono text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none whitespace-pre overflow-auto text-slate-100"
                                                     value={rawData}
-                                                    onChange={(e) => setRawData(e.target.value)}
+                                                    onChange={(e) => setRawDataWithHistory(e.target.value)}
                                                     placeholder="Paste CSV data here..."
                                                 />
                                             ) : (
-                                                <SpreadsheetEditor data={rawData} onUpdate={setRawData} />
+                                                <SpreadsheetEditor data={rawData} onUpdate={setRawDataWithHistory} onMoveRow={handleMoveRow} />
                                             )}
                                         </div>
                                     </div>
