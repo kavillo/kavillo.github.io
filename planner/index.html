@@ -70,14 +70,15 @@
             ChevronDown: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
             Minus: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/></svg>,
             Undo: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>,
-            Redo: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+            Redo: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>,
+            HelpCircle: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         };
 
         const { 
             Download, FileSpreadsheet, Settings, RefreshCw, Type, Clock, 
             Layout, Palette, Code, AlertCircle, Grid, Trash2, Plus, 
             Table, AlignLeft, Check, Maximize, Minimize, Copy, Save, Upload,
-            ChevronUp, ChevronDown, Minus, Undo, Redo
+            ChevronUp, ChevronDown, Minus, Undo, Redo, HelpCircle
         } = Icons;
 
         // --- Canvas Gantt Chart Renderer ---
@@ -699,6 +700,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
             const [focusedTaskIndex, setFocusedTaskIndex] = useState(-1);
             const [deleteConfirm, setDeleteConfirm] = useState({ show: false, index: -1, taskName: '' });
             const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+            const [showHelp, setShowHelp] = useState(false);
 
             // Toast notification helper
             const showToast = (message, type = 'success') => {
@@ -1175,6 +1177,131 @@ Marketing Launch, 0d, Deployment, , milestone`;
                             </div>
                         </div>
                     )}
+
+                    {/* Help Modal */}
+                    {showHelp && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/50" onClick={() => setShowHelp(false)}></div>
+                            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+                                <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                        <HelpCircle className="w-5 h-5 text-indigo-600" /> Help & Documentation
+                                    </h2>
+                                    <button 
+                                        onClick={() => setShowHelp(false)}
+                                        className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto space-y-6">
+                                    {/* Quick Start */}
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-3">Quick Start</h3>
+                                        <ul className="text-sm text-gray-600 space-y-2">
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> Add tasks using the <strong>+ Add Task</strong> button</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> Set duration using shortcuts: <code className="bg-gray-100 px-1 rounded">1d</code> (days), <code className="bg-gray-100 px-1 rounded">2w</code> (weeks), <code className="bg-gray-100 px-1 rounded">1m</code> (months)</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> Create dependencies by typing a task name or selecting from dropdown in Start/Dep column</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> Use <strong>−/+</strong> buttons to quickly adjust duration</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> Use <strong>↑/↓</strong> arrows to reorder tasks</li>
+                                        </ul>
+                                    </section>
+
+                                    {/* Task Options */}
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-3">Task Options</h3>
+                                        <ul className="text-sm text-gray-600 space-y-2">
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Milestone (✓)</strong> — Adds a star marker at the end of the task bar</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Silent (👁)</strong> — Task affects timing/dependencies but doesn't appear in the chart</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Color</strong> — Leave empty for auto-color from theme palette, or set a custom color</li>
+                                        </ul>
+                                    </section>
+
+                                    {/* Keyboard & Actions */}
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-3">Actions</h3>
+                                        <ul className="text-sm text-gray-600 space-y-2">
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Undo/Redo</strong> — Use the ↶/↷ buttons to undo or redo task changes</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Copy</strong> — Copies the chart as a PNG image to clipboard</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Save Image</strong> — Downloads the chart as a JPEG file</li>
+                                            <li className="flex gap-2"><span className="text-indigo-500">•</span> <strong>Save/Load Project</strong> — Export or import your project as a JSON file</li>
+                                        </ul>
+                                    </section>
+
+                                    {/* Google Sheets Format */}
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-3">Google Sheets Import</h3>
+                                        <p className="text-sm text-gray-600 mb-3">
+                                            To import from Google Sheets, your spreadsheet must be <strong>published to web</strong> (File → Share → Publish to web → CSV).
+                                        </p>
+                                        <p className="text-sm text-gray-600 mb-3">Structure your sheet with these columns:</p>
+                                        <div className="bg-gray-50 rounded-md p-3 overflow-x-auto">
+                                            <table className="text-xs w-full">
+                                                <thead>
+                                                    <tr className="text-left text-gray-500 border-b border-gray-200">
+                                                        <th className="pb-2 pr-4">Column</th>
+                                                        <th className="pb-2 pr-4">Required</th>
+                                                        <th className="pb-2">Description</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="text-gray-700">
+                                                    <tr className="border-b border-gray-100">
+                                                        <td className="py-2 pr-4 font-medium">A: Name</td>
+                                                        <td className="py-2 pr-4">Yes</td>
+                                                        <td className="py-2">Task name</td>
+                                                    </tr>
+                                                    <tr className="border-b border-gray-100">
+                                                        <td className="py-2 pr-4 font-medium">B: Duration</td>
+                                                        <td className="py-2 pr-4">Yes</td>
+                                                        <td className="py-2">Duration with unit (e.g., 2w, 5d, 1m)</td>
+                                                    </tr>
+                                                    <tr className="border-b border-gray-100">
+                                                        <td className="py-2 pr-4 font-medium">C: Start/Dep</td>
+                                                        <td className="py-2 pr-4">No</td>
+                                                        <td className="py-2">Start date or dependency task name</td>
+                                                    </tr>
+                                                    <tr className="border-b border-gray-100">
+                                                        <td className="py-2 pr-4 font-medium">D: Color</td>
+                                                        <td className="py-2 pr-4">No</td>
+                                                        <td className="py-2">Hex color (e.g., #6366f1) or leave empty</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="py-2 pr-4 font-medium">E: Type</td>
+                                                        <td className="py-2 pr-4">No</td>
+                                                        <td className="py-2"><code className="bg-gray-200 px-1 rounded">milestone</code> or <code className="bg-gray-200 px-1 rounded">silent</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-3">Example row: <code className="bg-gray-100 px-1 rounded">Design Phase, 2w, , #ec4899, milestone</code></p>
+                                    </section>
+
+                                    {/* CSV Format */}
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-3">CSV/Text Format</h3>
+                                        <p className="text-sm text-gray-600 mb-2">When using Raw Text mode, use this CSV format:</p>
+                                        <code className="block bg-gray-50 p-3 rounded text-xs text-gray-700">
+                                            Name, Duration, Start/Dependency, Color, Type<br/>
+                                            Planning, 1w, , , <br/>
+                                            Design, 2w, Planning, #6366f1, <br/>
+                                            Development, 4w, Design, , <br/>
+                                            Launch, 0d, Development, #10b981, milestone
+                                        </code>
+                                    </section>
+                                </div>
+                                <div className="p-4 border-t border-gray-200 bg-gray-50">
+                                    <button 
+                                        onClick={() => setShowHelp(false)}
+                                        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                    >
+                                        Got it!
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {/* Header - Hidden in Full Screen */}
                     <header className={`bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm z-10 shrink-0 ${isFullScreen ? 'hidden' : 'flex'}`}>
                         <div className="flex items-center gap-3">
@@ -1184,6 +1311,13 @@ Marketing Launch, 0d, Deployment, , milestone`;
                             <h1 className="text-xl font-bold text-gray-900">Project Plan Creator</h1>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => setShowHelp(true)}
+                                className="p-2 text-gray-500 hover:bg-gray-100 rounded-md"
+                                title="Help"
+                            >
+                                <HelpCircle className="w-5 h-5" />
+                            </button>
                             <button 
                                 onClick={() => setActiveTab('preview')}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'preview' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
