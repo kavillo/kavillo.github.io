@@ -67,14 +67,17 @@
             Save: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
             Upload: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
             ChevronUp: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
-            ChevronDown: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            ChevronDown: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+            Minus: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/></svg>,
+            Undo: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>,
+            Redo: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
         };
 
         const { 
             Download, FileSpreadsheet, Settings, RefreshCw, Type, Clock, 
             Layout, Palette, Code, AlertCircle, Grid, Trash2, Plus, 
             Table, AlignLeft, Check, Maximize, Minimize, Copy, Save, Upload,
-            ChevronUp, ChevronDown
+            ChevronUp, ChevronDown, Minus, Undo, Redo
         } = Icons;
 
         // --- Canvas Gantt Chart Renderer ---
@@ -650,6 +653,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
 
             // -- State --
             const [activeTab, setActiveTab] = useState('editor');
+            const [editorSubTab, setEditorSubTab] = useState('data'); // 'data' or 'style'
             const [projectTitle, setProjectTitle] = useState(savedData?.projectTitle || 'Project Timeline');
             const [customerName, setCustomerName] = useState(savedData?.customerName || '');
             const [scale, setScale] = useState(savedData?.scale || 'weeks');
@@ -689,8 +693,18 @@ Marketing Launch, 0d, Deployment, , milestone`;
             const [editorMode, setEditorMode] = useState('grid');
             const initialTasks = savedData?.tasks ? savedData.tasks : csvToTasks(DEFAULT_CSV);
             const [tasks, setTasks] = useState(initialTasks);
+            const [tasksHistory, setTasksHistory] = useState([]);
+            const [tasksFuture, setTasksFuture] = useState([]);
             const [textBuffer, setTextBuffer] = useState(savedData?.textBuffer || tasksToCsv(initialTasks));
             const [focusedTaskIndex, setFocusedTaskIndex] = useState(-1);
+            const [deleteConfirm, setDeleteConfirm] = useState({ show: false, index: -1, taskName: '' });
+            const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+            // Toast notification helper
+            const showToast = (message, type = 'success') => {
+                setToast({ show: true, message, type });
+                setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+            };
 
             // Custom Colors State
             const [customColors, setCustomColors] = useState(savedData?.customColors || {
@@ -779,10 +793,32 @@ Marketing Launch, 0d, Deployment, , milestone`;
             };
 
             // -- Grid Operations --
+            const setTasksWithHistory = (newTasks) => {
+                setTasksHistory(prev => [...prev.slice(-49), tasks]); // Keep last 50 states
+                setTasksFuture([]);
+                setTasks(newTasks);
+            };
+
+            const undo = () => {
+                if (tasksHistory.length === 0) return;
+                const previous = tasksHistory[tasksHistory.length - 1];
+                setTasksHistory(prev => prev.slice(0, -1));
+                setTasksFuture(prev => [tasks, ...prev]);
+                setTasks(previous);
+            };
+
+            const redo = () => {
+                if (tasksFuture.length === 0) return;
+                const next = tasksFuture[0];
+                setTasksFuture(prev => prev.slice(1));
+                setTasksHistory(prev => [...prev, tasks]);
+                setTasks(next);
+            };
+
             const updateTask = (index, field, value) => {
                 const newTasks = [...tasks];
                 newTasks[index] = { ...newTasks[index], [field]: value };
-                setTasks(newTasks);
+                setTasksWithHistory(newTasks);
             };
 
             const addTask = () => {
@@ -791,11 +827,11 @@ Marketing Launch, 0d, Deployment, , milestone`;
                     // Insert after the focused task
                     const newTasks = [...tasks];
                     newTasks.splice(focusedTaskIndex + 1, 0, newTask);
-                    setTasks(newTasks);
+                    setTasksWithHistory(newTasks);
                     setFocusedTaskIndex(focusedTaskIndex + 1);
                 } else {
                     // Add at the end
-                    setTasks([...tasks, newTask]);
+                    setTasksWithHistory([...tasks, newTask]);
                     setFocusedTaskIndex(tasks.length);
                 }
             };
@@ -804,7 +840,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                 if (index <= 0) return;
                 const newTasks = [...tasks];
                 [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
-                setTasks(newTasks);
+                setTasksWithHistory(newTasks);
                 setFocusedTaskIndex(index - 1);
             };
 
@@ -812,14 +848,39 @@ Marketing Launch, 0d, Deployment, , milestone`;
                 if (index >= tasks.length - 1) return;
                 const newTasks = [...tasks];
                 [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
-                setTasks(newTasks);
+                setTasksWithHistory(newTasks);
                 setFocusedTaskIndex(index + 1);
+            };
+
+            const adjustDuration = (index, delta) => {
+                const task = tasks[index];
+                const duration = task.duration || '1w';
+                // Parse the duration: extract number and unit
+                const match = duration.match(/^([\d.]+)\s*([dwmDWM]?)$/);
+                if (!match) return;
+                let value = parseFloat(match[1]) || 1;
+                let unit = match[2].toLowerCase() || 'd';
+                // Adjust value
+                value = Math.max(0.5, value + delta);
+                // Format back
+                const newDuration = `${value}${unit}`;
+                updateTask(index, 'duration', newDuration);
             };
 
             const removeTask = (index) => {
                 const newTasks = [...tasks];
                 newTasks.splice(index, 1);
-                setTasks(newTasks);
+                setTasksWithHistory(newTasks);
+                setDeleteConfirm({ show: false, index: -1, taskName: '' });
+            };
+
+            const confirmDeleteTask = (index) => {
+                const taskName = tasks[index]?.name || 'this task';
+                setDeleteConfirm({ show: true, index, taskName });
+            };
+
+            const cancelDelete = () => {
+                setDeleteConfirm({ show: false, index: -1, taskName: '' });
             };
 
             // -- Data Processing for Chart --
@@ -914,7 +975,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                 try {
                     const match = googleSheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
                     if (!match) {
-                        alert("Invalid Google Sheet URL.");
+                        showToast("Invalid Google Sheet URL.", 'error');
                         return;
                     }
                     const sheetId = match[1];
@@ -928,9 +989,9 @@ Marketing Launch, 0d, Deployment, , milestone`;
                     setTextBuffer(text);
                     setEditorMode('grid');
                     
-                    alert("Data loaded successfully!");
+                    showToast("Data loaded successfully!");
                 } catch (e) {
-                    alert(e.message);
+                    showToast(e.message, 'error');
                 }
             };
 
@@ -1038,9 +1099,9 @@ Marketing Launch, 0d, Deployment, , milestone`;
                         }
                         if (data.customColors) setCustomColors(data.customColors);
                         
-                        alert('Project loaded successfully!');
+                        showToast('Project loaded successfully!');
                     } catch (err) {
-                        alert('Failed to load project: Invalid JSON file');
+                        showToast('Failed to load project: Invalid JSON file', 'error');
                         console.error(err);
                     }
                 };
@@ -1052,6 +1113,68 @@ Marketing Launch, 0d, Deployment, , milestone`;
 
             return (
                 <div className="flex flex-col h-screen bg-gray-50 text-gray-800 font-sans">
+                    {/* Custom Delete Confirmation Dialog */}
+                    {deleteConfirm.show && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/50" onClick={cancelDelete}></div>
+                            <div className="relative bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in duration-200">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="bg-red-100 p-2 rounded-full">
+                                        <Trash2 className="w-5 h-5 text-red-600" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Delete Task</h3>
+                                </div>
+                                <p className="text-gray-600 mb-6">
+                                    Are you sure you want to delete <span className="font-medium text-gray-900">"{deleteConfirm.taskName}"</span>? This action cannot be undone.
+                                </p>
+                                <div className="flex gap-3 justify-end">
+                                    <button 
+                                        onClick={cancelDelete}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={() => removeTask(deleteConfirm.index)}
+                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Toast Notification */}
+                    {toast.show && (
+                        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top fade-in duration-300">
+                            <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
+                                toast.type === 'error' 
+                                    ? 'bg-red-50 border border-red-200 text-red-800' 
+                                    : 'bg-green-50 border border-green-200 text-green-800'
+                            }`}>
+                                <div className={`p-1 rounded-full ${
+                                    toast.type === 'error' ? 'bg-red-100' : 'bg-green-100'
+                                }`}>
+                                    {toast.type === 'error' 
+                                        ? <AlertCircle className="w-4 h-4 text-red-600" />
+                                        : <Check className="w-4 h-4 text-green-600" />
+                                    }
+                                </div>
+                                <span className="text-sm font-medium">{toast.message}</span>
+                                <button 
+                                    onClick={() => setToast({ show: false, message: '', type: 'success' })}
+                                    className={`ml-2 p-1 rounded hover:bg-opacity-50 ${
+                                        toast.type === 'error' ? 'hover:bg-red-200' : 'hover:bg-green-200'
+                                    }`}
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     {/* Header - Hidden in Full Screen */}
                     <header className={`bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm z-10 shrink-0 ${isFullScreen ? 'hidden' : 'flex'}`}>
                         <div className="flex items-center gap-3">
@@ -1061,12 +1184,6 @@ Marketing Launch, 0d, Deployment, , milestone`;
                             <h1 className="text-xl font-bold text-gray-900">Project Plan Creator</h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button 
-                                onClick={() => setActiveTab('editor')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'editor' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                Editor
-                            </button>
                             <button 
                                 onClick={() => setActiveTab('preview')}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'preview' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
@@ -1114,6 +1231,24 @@ Marketing Launch, 0d, Deployment, , milestone`;
                         {/* Editor Panel */}
                         <div className={`w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col ${isFullScreen ? 'hidden' : (activeTab === 'preview' ? 'hidden md:flex' : 'flex')}`}>
                             <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                                {/* Tab Switcher */}
+                                <div className="flex bg-gray-100 p-1 rounded-lg">
+                                    <button 
+                                        onClick={() => setEditorSubTab('data')}
+                                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${editorSubTab === 'data' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+                                    >
+                                        Editor
+                                    </button>
+                                    <button 
+                                        onClick={() => setEditorSubTab('style')}
+                                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${editorSubTab === 'style' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+                                    >
+                                        Style
+                                    </button>
+                                </div>
+
+                                {/* Data Tab Content */}
+                                {editorSubTab === 'data' && (<>
                                 {/* Settings */}
                                 <div className="space-y-4">
                                     <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
@@ -1182,91 +1317,37 @@ Marketing Launch, 0d, Deployment, , milestone`;
 
                                 <hr className="border-gray-100" />
 
-                                {/* Theme Selector */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
-                                            <Palette className="w-4 h-4" /> Visual Style
-                                        </h2>
-                                        <button 
-                                            onClick={() => setShowCssEditor(!showCssEditor)}
-                                            className={`p-1 rounded hover:bg-gray-100 transition-colors ${showCssEditor ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400'}`}
-                                            title="Customize Style JSON"
-                                        >
-                                            <Code className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                    {!showCssEditor ? (
-                                        <div className="relative">
-                                            <select 
-                                                value={selectedThemeId}
-                                                onChange={handleThemeChange}
-                                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white appearance-none"
-                                            >
-                                                {Object.values(THEMES).map(t => (
-                                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                                ))}
-                                                {selectedThemeId === 'custom' && <option value="custom">Custom (Unsaved)</option>}
-                                            </select>
-                                            <div className="absolute right-3 top-2.5 pointer-events-none">
-                                                <div className="w-4 h-4 rounded-full border border-gray-200" style={{ background: `linear-gradient(45deg, ${activeTheme.palette[0]}, ${activeTheme.palette[1]})` }}></div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <textarea 
-                                            value={themeJson} onChange={handleJsonEdit}
-                                            className={`w-full h-48 font-mono text-xs p-2 border rounded-md outline-none resize-y ${jsonError ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-indigo-500'}`}
-                                        />
-                                    )}
-
-                                    {/* Custom Colors */}
-                                    <div className="mt-4 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-gray-600">Custom Colors</span>
-                                            <button 
-                                                onClick={resetCustomColors}
-                                                className="text-xs text-gray-400 hover:text-gray-600"
-                                            >
-                                                Reset
-                                            </button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {[
-                                                { key: 'background', label: 'Background', fallback: activeTheme.bg },
-                                                { key: 'taskName', label: 'Task Names', fallback: activeTheme.text },
-                                                { key: 'duration', label: 'Duration', fallback: activeTheme.textSecondary },
-                                                { key: 'gridLine', label: 'Grid Lines', fallback: activeTheme.gridLine }
-                                            ].map(({ key, label, fallback }) => (
-                                                <div key={key} className="flex items-center gap-2">
-                                                    <div className="relative w-6 h-6 rounded border border-gray-300 overflow-hidden shrink-0">
-                                                        <input 
-                                                            type="color" 
-                                                            value={customColors[key] || fallback}
-                                                            onChange={(e) => updateCustomColor(key, e.target.value)}
-                                                            className="absolute -top-1 -left-1 w-8 h-8 p-0 border-0 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                    <span className="text-xs text-gray-600 truncate">{label}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <hr className="border-gray-100" />
-
                                 {/* Tasks Data Editor */}
                                 <div className="space-y-4 flex-1 flex flex-col">
                                     <div className="flex items-center justify-between">
                                         <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
                                             <Type className="w-4 h-4" /> Tasks
                                         </h2>
-                                        <button 
-                                            onClick={toggleEditorMode}
-                                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium bg-indigo-50 px-2 py-1 rounded"
-                                        >
-                                            {editorMode === 'grid' ? <><AlignLeft className="w-3 h-3"/> Raw Text</> : <><Table className="w-3 h-3"/> Grid View</>}
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button 
+                                                onClick={undo}
+                                                disabled={tasksHistory.length === 0}
+                                                className={`p-1 rounded transition-colors ${tasksHistory.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                                title="Undo"
+                                            >
+                                                <Undo className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={redo}
+                                                disabled={tasksFuture.length === 0}
+                                                className={`p-1 rounded transition-colors ${tasksFuture.length === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                                title="Redo"
+                                            >
+                                                <Redo className="w-4 h-4" />
+                                            </button>
+                                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                                            <button 
+                                                onClick={toggleEditorMode}
+                                                className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium bg-indigo-50 px-2 py-1 rounded"
+                                            >
+                                                {editorMode === 'grid' ? <><AlignLeft className="w-3 h-3"/> Raw Text</> : <><Table className="w-3 h-3"/> Grid View</>}
+                                            </button>
+                                        </div>
                                     </div>
                                     
                                     {editorMode === 'grid' ? (
@@ -1296,20 +1377,54 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                                                 />
                                                             </td>
                                                             <td className="p-1">
-                                                                <input 
-                                                                    type="text" value={task.duration} onChange={(e) => updateTask(idx, 'duration', e.target.value)}
-                                                                    onFocus={() => setFocusedTaskIndex(idx)}
-                                                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-600"
-                                                                    placeholder="1w"
-                                                                />
+                                                                <div className="flex items-center gap-0.5">
+                                                                    <button 
+                                                                        onClick={() => adjustDuration(idx, -1)}
+                                                                        className="p-0.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                                        title="Decrease duration"
+                                                                    >
+                                                                        <Minus className="w-3 h-3" />
+                                                                    </button>
+                                                                    <input 
+                                                                        type="text" value={task.duration} onChange={(e) => updateTask(idx, 'duration', e.target.value)}
+                                                                        onFocus={() => setFocusedTaskIndex(idx)}
+                                                                        className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-600 text-center"
+                                                                        placeholder="1w"
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => adjustDuration(idx, 1)}
+                                                                        className="p-0.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                                        title="Increase duration"
+                                                                    >
+                                                                        <Plus className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                             <td className="p-1">
-                                                                <input 
-                                                                    type="text" value={task.start} onChange={(e) => updateTask(idx, 'start', e.target.value)}
-                                                                    onFocus={() => setFocusedTaskIndex(idx)}
-                                                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-600"
-                                                                    placeholder="Start..."
-                                                                />
+                                                                <div className="flex items-center gap-1">
+                                                                    <input 
+                                                                        type="text" value={task.start} onChange={(e) => updateTask(idx, 'start', e.target.value)}
+                                                                        onFocus={() => setFocusedTaskIndex(idx)}
+                                                                        className="flex-1 min-w-0 bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 text-gray-600 text-xs"
+                                                                        placeholder="Start..."
+                                                                    />
+                                                                    <select
+                                                                        value=""
+                                                                        onChange={(e) => {
+                                                                            if (e.target.value) {
+                                                                                updateTask(idx, 'start', e.target.value);
+                                                                            }
+                                                                        }}
+                                                                        className="w-6 h-6 p-0 bg-transparent border-none text-gray-400 hover:text-indigo-600 cursor-pointer focus:ring-1 focus:ring-indigo-500 rounded appearance-none"
+                                                                        title="Select dependency"
+                                                                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}
+                                                                    >
+                                                                        <option value="">...</option>
+                                                                        {tasks.filter((_, i) => i !== idx).map((t, i) => (
+                                                                            <option key={t.id} value={t.name}>{t.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
                                                             </td>
                                                             <td className="p-1">
                                                                 <div className="flex items-center gap-1">
@@ -1363,7 +1478,7 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                                                 </div>
                                                             </td>
                                                             <td className="p-1 text-center">
-                                                                <button onClick={() => removeTask(idx)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50">
+                                                                <button onClick={() => confirmDeleteTask(idx)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50">
                                                                     <Trash2 className="w-3.5 h-3.5" />
                                                                 </button>
                                                             </td>
@@ -1434,6 +1549,106 @@ Marketing Launch, 0d, Deployment, , milestone`;
                                         />
                                     </div>
                                 </div>
+                                </>)}
+
+                                {/* Style Tab Content */}
+                                {editorSubTab === 'style' && (
+                                <>
+                                {/* Theme Selector */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
+                                            <Palette className="w-4 h-4" /> Theme
+                                        </h2>
+                                        <button 
+                                            onClick={() => setShowCssEditor(!showCssEditor)}
+                                            className={`p-1 rounded hover:bg-gray-100 transition-colors ${showCssEditor ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400'}`}
+                                            title="Customize Style JSON"
+                                        >
+                                            <Code className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    {!showCssEditor ? (
+                                        <div className="relative">
+                                            <select 
+                                                value={selectedThemeId}
+                                                onChange={handleThemeChange}
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white appearance-none"
+                                            >
+                                                {Object.values(THEMES).map(t => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                                {selectedThemeId === 'custom' && <option value="custom">Custom (Unsaved)</option>}
+                                            </select>
+                                            <div className="absolute right-3 top-2.5 pointer-events-none">
+                                                <div className="w-4 h-4 rounded-full border border-gray-200" style={{ background: `linear-gradient(45deg, ${activeTheme.palette[0]}, ${activeTheme.palette[1]})` }}></div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <textarea 
+                                            value={themeJson} onChange={handleJsonEdit}
+                                            className={`w-full h-48 font-mono text-xs p-2 border rounded-md outline-none resize-y ${jsonError ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-indigo-500'}`}
+                                        />
+                                    )}
+                                </div>
+
+                                <hr className="border-gray-100" />
+
+                                {/* Custom Colors */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-2">
+                                            <Palette className="w-4 h-4" /> Custom Colors
+                                        </h2>
+                                        <button 
+                                            onClick={resetCustomColors}
+                                            className="text-xs text-gray-400 hover:text-gray-600"
+                                        >
+                                            Reset
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                            { key: 'background', label: 'Background', fallback: activeTheme.bg },
+                                            { key: 'taskName', label: 'Task Names', fallback: activeTheme.text },
+                                            { key: 'duration', label: 'Duration', fallback: activeTheme.textSecondary },
+                                            { key: 'gridLine', label: 'Grid Lines', fallback: activeTheme.gridLine }
+                                        ].map(({ key, label, fallback }) => (
+                                            <div key={key} className="flex items-center gap-2">
+                                                <div className="relative w-6 h-6 rounded border border-gray-300 overflow-hidden shrink-0">
+                                                    <input 
+                                                        type="color" 
+                                                        value={customColors[key] || fallback}
+                                                        onChange={(e) => updateCustomColor(key, e.target.value)}
+                                                        className="absolute -top-1 -left-1 w-8 h-8 p-0 border-0 cursor-pointer"
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-600 truncate">{label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <hr className="border-gray-100" />
+
+                                {/* Color Palette Preview */}
+                                <div className="space-y-4">
+                                    <h2 className="text-sm uppercase tracking-wider text-gray-500 font-semibold">
+                                        Task Color Palette
+                                    </h2>
+                                    <div className="flex flex-wrap gap-2">
+                                        {activeTheme.palette.map((color, i) => (
+                                            <div 
+                                                key={i} 
+                                                className="w-8 h-8 rounded-md shadow-sm border border-gray-200" 
+                                                style={{ backgroundColor: color }}
+                                                title={color}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                                </>
+                                )}
 
                             </div>
                         </div>
