@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weight Tracker</title>
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EY2YJ4KGED"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-EY2YJ4KGED');
+    </script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- html2canvas for image export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        /* Spreadsheet Grid Styles */
+        .sheet-grid {
+            display: grid;
+            gap: 1px;
+            background-color: #334155;
+            border: 1px solid #334155;
+            overflow: auto;
+            align-content: start;
+        }
+        .sheet-cell {
+            background-color: #0f172a;
+            padding: 0;
+            min-width: 120px;
+            height: 36px;
+        }
+        .sheet-cell input {
+            width: 100%;
+            height: 36px;
+            background: transparent;
+            color: #e2e8f0;
+            border: none;
+            outline: none;
+            font-size: 0.875rem;
+            padding: 4px 8px;
+            line-height: 1.2;
+            box-sizing: border-box;
+        }
+        .sheet-cell input:focus {
+            background: #1e293b;
+            border-radius: 2px;
+        }
+        .sheet-header {
+            background-color: #1e293b;
+            font-weight: 600;
+            color: #94a3b8;
+            text-align: center;
+            height: 36px;
+        }
+        
+        /* Toast animation */
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fade-in 0.2s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useCallback, useRef } = React;
+
+        // --- ICONS (SVG Components) ---
+        const LineChartIcon = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        );
+        const BarChart3 = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        );
+        const RefreshCw = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        );
+        const LinkIcon = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        );
+        const Download = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        );
+        const Upload = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        );
+        const Table2 = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+        );
+        const FileText = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+        );
+        const Plus = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        );
+        const X = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        );
+        const HelpCircle = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        );
+        const Undo = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        );
+        const Redo = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+        );
+        const Clipboard = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+        );
+        const Save = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        );
+        const FolderOpen = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+        );
+        const Filter = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        );
+        const Calendar = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        );
+        const Scale = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+        );
+        const Maximize = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        );
+        const Minimize = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        );
+
+
+        // --- CONSTANTS ---
+        const DEFAULT_DATA = `Date,Weight
+2026-01-01,85.5
+2026-01-08,85.2
+2026-01-15,84.8
+2026-01-22,84.5
+2026-01-29,84.2
+2026-02-05,83.9
+2026-02-12,83.5`;
+
+        const STORAGE_KEYS = {
+            rawData: 'weightTracker_rawData',
+            sheetUrl: 'weightTracker_sheetUrl',
+            chartType: 'weightTracker_chartType',
+            barGranularity: 'weightTracker_barGranularity',
+            dateFilter: 'weightTracker_dateFilter',
+            customStartDate: 'weightTracker_customStartDate',
+            isRawMode: 'weightTracker_isRawMode',
+            targetWeight: 'weightTracker_targetWeight',
+            showTrend: 'weightTracker_showTrend',
+        };
+
+        const DATE_FILTERS = [
+            { value: 'all', label: 'Since Beginning' },
+            { value: '1m', label: 'Last Month' },
+            { value: '2m', label: 'Last 2 Months' },
+            { value: '3m', label: 'Last 3 Months' },
+            { value: '6m', label: 'Last Semester' },
+            { value: '1y', label: 'Last Year' },
+            { value: 'custom', label: 'From Date...' },
+        ];
+
+        const BAR_GRANULARITIES = [
+            { value: 'week', label: 'Weekly' },
+            { value: 'month', label: 'Monthly' },
+            { value: 'quarter', label: 'Quarterly' },
+            { value: 'year', label: 'Yearly' },
+        ];
+
+        // --- HELPERS ---
+        const parseCSV = (str) => {
+            return str.trim().split('\n').map(line => line.split(',').map(s => s.trim()));
+        };
+
+        const toCSV = (rows) => {
+            return rows.map(r => r.join(',')).join('\n');
+        };
+
+        // Quadratic regression calculation for curved trend
+        const calculateQuadraticRegression = (data) => {
+            if (data.length < 3) return null;
+            
+            const n = data.length;
+            const firstDate = data[0].date.getTime();
+            
+            // Use days from first date as x values
+            const points = data.map(d => ({
+                x: (d.date.getTime() - firstDate) / (1000 * 60 * 60 * 24), // days
+                y: d.weight
+            }));
+            
+            // Solve for y = ax² + bx + c using normal equations
+            let sumX = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0;
+            let sumY = 0, sumXY = 0, sumX2Y = 0;
+            
+            for (const p of points) {
+                const x2 = p.x * p.x;
+                sumX += p.x;
+                sumX2 += x2;
+                sumX3 += x2 * p.x;
+                sumX4 += x2 * x2;
+                sumY += p.y;
+                sumXY += p.x * p.y;
+                sumX2Y += x2 * p.y;
+            }
+            
+            // Solve 3x3 system using Cramer's rule
+            // [n    sumX   sumX2 ] [c]   [sumY  ]
+            // [sumX sumX2  sumX3 ] [b] = [sumXY ]
+            // [sumX2 sumX3 sumX4 ] [a]   [sumX2Y]
+            
+            const det = n * (sumX2 * sumX4 - sumX3 * sumX3)
+                      - sumX * (sumX * sumX4 - sumX3 * sumX2)
+                      + sumX2 * (sumX * sumX3 - sumX2 * sumX2);
+            
+            if (Math.abs(det) < 1e-10) return null; // Singular matrix
+            
+            const c = (sumY * (sumX2 * sumX4 - sumX3 * sumX3)
+                     - sumX * (sumXY * sumX4 - sumX3 * sumX2Y)
+                     + sumX2 * (sumXY * sumX3 - sumX2 * sumX2Y)) / det;
+            
+            const b = (n * (sumXY * sumX4 - sumX3 * sumX2Y)
+                     - sumY * (sumX * sumX4 - sumX3 * sumX2)
+                     + sumX2 * (sumX * sumX2Y - sumXY * sumX2)) / det;
+            
+            const a = (n * (sumX2 * sumX2Y - sumXY * sumX3)
+                     - sumX * (sumX * sumX2Y - sumXY * sumX2)
+                     + sumY * (sumX * sumX3 - sumX2 * sumX2)) / det;
+            
+            const lastDays = points[points.length - 1].x;
+            const currentSlope = 2 * a * lastDays + b; // Derivative at last point
+            const lastWeight = points[points.length - 1].y;
+            
+            return {
+                a, b, c, // y = ax² + bx + c
+                currentSlope, // instantaneous slope at last data point (kg/day)
+                firstDate,
+                lastDays,
+                lastWeight,
+                predict: (date) => {
+                    const days = (date.getTime() - firstDate) / (1000 * 60 * 60 * 24);
+                    return a * days * days + b * days + c;
+                },
+                predictDays: (days) => {
+                    return a * days * days + b * days + c;
+                },
+                // Linear extrapolation from current point using current slope
+                linearPredictDate: (targetWeight) => {
+                    if (Math.abs(currentSlope) < 1e-10) return null;
+                    const daysNeeded = (targetWeight - lastWeight) / currentSlope;
+                    if (daysNeeded <= 0) return null;
+                    return new Date(firstDate + (lastDays + daysNeeded) * 24 * 60 * 60 * 1000);
+                },
+                // Solve ax² + bx + c = targetWeight for future x > lastDays
+                predictDate: (targetWeight) => {
+                    // If a is very small, use linear extrapolation
+                    if (Math.abs(a) < 1e-10) {
+                        if (Math.abs(currentSlope) < 1e-10) return null;
+                        const daysNeeded = (targetWeight - lastWeight) / currentSlope;
+                        if (daysNeeded <= 0) return null;
+                        return new Date(firstDate + (lastDays + daysNeeded) * 24 * 60 * 60 * 1000);
+                    }
+                    
+                    // Quadratic: ax² + bx + (c - target) = 0
+                    const c2 = c - targetWeight;
+                    const discriminant = b * b - 4 * a * c2;
+                    
+                    // If no quadratic solution, fall back to linear from current slope
+                    if (discriminant < 0) {
+                        if (Math.abs(currentSlope) < 1e-10) return null;
+                        const daysNeeded = (targetWeight - lastWeight) / currentSlope;
+                        if (daysNeeded <= 0) return null;
+                        return new Date(firstDate + (lastDays + daysNeeded) * 24 * 60 * 60 * 1000);
+                    }
+                    
+                    const sqrtD = Math.sqrt(discriminant);
+                    const x1 = (-b + sqrtD) / (2 * a);
+                    const x2 = (-b - sqrtD) / (2 * a);
+                    
+                    // Pick the solution that's in the future
+                    let days = null;
+                    if (x1 > lastDays) days = x1;
+                    if (x2 > lastDays && (days === null || x2 < days)) days = x2;
+                    
+                    // If no future quadratic solution, fall back to linear
+                    if (days === null) {
+                        if (Math.abs(currentSlope) < 1e-10) return null;
+                        const daysNeeded = (targetWeight - lastWeight) / currentSlope;
+                        if (daysNeeded <= 0) return null;
+                        return new Date(firstDate + (lastDays + daysNeeded) * 24 * 60 * 60 * 1000);
+                    }
+                    return new Date(firstDate + days * 24 * 60 * 60 * 1000);
+                }
+            };
+        };
+
+        const parseDate = (dateStr) => {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
+        const formatDate = (date) => {
+            return date.toISOString().split('T')[0];
+        };
+
+        const formatDateLocale = (date) => {
+            return date.toLocaleDateString(undefined, { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        };
+
+        const getISOWeekYear = (date) => {
+            // Returns { year, week } where year is the ISO week year (not calendar year)
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const year = d.getUTCFullYear();
+            const yearStart = new Date(Date.UTC(year, 0, 1));
+            const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return { year, week };
+        };
+
+        const getWeekNumber = (date) => {
+            return getISOWeekYear(date).week;
+        };
+
+        const getQuarter = (date) => {
+            return Math.floor(date.getMonth() / 3) + 1;
+        };
+
+        const getFilterStartDate = (filter, customDate) => {
+            const now = new Date();
+            switch (filter) {
+                case '1m': return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                case '2m': return new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+                case '3m': return new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+                case '6m': return new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+                case '1y': return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                case 'custom': return customDate ? parseDate(customDate) : null;
+                default: return null;
+            }
+        };
+
+        const groupByGranularity = (data, granularity) => {
+            const groups = {};
+            
+            data.forEach(item => {
+                let key;
+                const d = item.date;
+                
+                switch (granularity) {
+                    case 'week':
+                        const isoWeek = getISOWeekYear(d);
+                        key = `${isoWeek.year}-W${String(isoWeek.week).padStart(2, '0')}`;
+                        break;
+                    case 'month':
+                        key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        break;
+                    case 'quarter':
+                        key = `${d.getFullYear()}-Q${getQuarter(d)}`;
+                        break;
+                    case 'year':
+                        key = `${d.getFullYear()}`;
+                        break;
+                    default:
+                        key = formatDate(d);
+                }
+                
+                if (!groups[key]) {
+                    groups[key] = { weights: [], dates: [] };
+                }
+                groups[key].weights.push(item.weight);
+                groups[key].dates.push(item.date);
+            });
+            
+            return Object.entries(groups).map(([key, { weights, dates }]) => {
+                const sortedDates = dates.sort((a, b) => a - b);
+                return {
+                    label: key,
+                    average: weights.reduce((a, b) => a + b, 0) / weights.length,
+                    min: Math.min(...weights),
+                    max: Math.max(...weights),
+                    count: weights.length,
+                    firstDate: sortedDates[0],
+                    lastDate: sortedDates[sortedDates.length - 1],
+                };
+            }).sort((a, b) => a.label.localeCompare(b.label));
+        };
+
+        // --- Canvas Line Chart Renderer ---
+        const CanvasLineChart = ({ data, canvasRef, title, targetWeight, showTrend }) => {
+            const regression = useMemo(() => {
+                if (!showTrend || !data || data.length < 3) return null;
+                return calculateQuadraticRegression(data);
+            }, [data, showTrend]);
+            
+            useEffect(() => {
+                if (!data || data.length === 0 || !canvasRef.current) return;
+                
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                
+                const width = 900;
+                const height = 500;
+                const padding = { top: 60, right: 50, bottom: 80, left: 70 };
+                
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
+                ctx.scale(dpr, dpr);
+                
+                // Background
+                ctx.fillStyle = '#111425';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Title
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 20px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(title || 'Weight Over Time', width / 2, 35);
+                
+                // Chart area
+                const chartLeft = padding.left;
+                const chartRight = width - padding.right;
+                const chartTop = padding.top;
+                const chartBottom = height - padding.bottom;
+                const chartWidth = chartRight - chartLeft;
+                const chartHeight = chartBottom - chartTop;
+                
+                // Calculate scales
+                const weights = data.map(d => d.weight);
+                let minWeight = Math.floor(Math.min(...weights) - 1);
+                let maxWeight = Math.ceil(Math.max(...weights) + 1);
+                
+                // Adjust scale if target weight is set
+                if (targetWeight && !isNaN(targetWeight)) {
+                    minWeight = Math.min(minWeight, targetWeight - 1);
+                    maxWeight = Math.max(maxWeight, targetWeight + 1);
+                }
+                
+                const weightRange = maxWeight - minWeight;
+                
+                const xScale = (i) => chartLeft + (i / (data.length - 1)) * chartWidth;
+                const yScale = (w) => chartBottom - ((w - minWeight) / weightRange) * chartHeight;
+                
+                // Grid lines
+                ctx.strokeStyle = '#2d3755';
+                ctx.lineWidth = 1;
+                
+                // Horizontal grid lines
+                const ySteps = 5;
+                for (let i = 0; i <= ySteps; i++) {
+                    const y = chartBottom - (i / ySteps) * chartHeight;
+                    ctx.beginPath();
+                    ctx.moveTo(chartLeft, y);
+                    ctx.lineTo(chartRight, y);
+                    ctx.stroke();
+                    
+                    // Y-axis labels
+                    const weight = minWeight + (i / ySteps) * weightRange;
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '12px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(weight.toFixed(1) + ' kg', chartLeft - 10, y + 4);
+                }
+                
+                // Draw vertical month markers
+                let prevMonth = null;
+                data.forEach((d, i) => {
+                    const currentMonth = d.date.getFullYear() * 12 + d.date.getMonth();
+                    if (prevMonth !== null && currentMonth !== prevMonth) {
+                        const x = xScale(i);
+                        ctx.strokeStyle = '#4b5563';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([4, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(x, chartTop);
+                        ctx.lineTo(x, chartBottom);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        // Month label
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        ctx.fillStyle = '#6b7280';
+                        ctx.font = '10px Inter, system-ui, sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(monthNames[d.date.getMonth()], x + 3, chartTop + 12);
+                    }
+                    prevMonth = currentMonth;
+                });
+                
+                // Draw target weight line
+                if (targetWeight && !isNaN(targetWeight) && targetWeight >= minWeight && targetWeight <= maxWeight) {
+                    const targetY = yScale(targetWeight);
+                    ctx.strokeStyle = '#22c55e';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([8, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(chartLeft, targetY);
+                    ctx.lineTo(chartRight, targetY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // Target label
+                    ctx.fillStyle = '#22c55e';
+                    ctx.font = 'bold 11px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`Target: ${targetWeight} kg`, chartRight, targetY - 6);
+                }
+                
+                // Draw trend curve
+                if (showTrend && regression) {
+                    // Draw curved trend line using many small segments
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 3]);
+                    ctx.beginPath();
+                    
+                    const segments = 50;
+                    for (let i = 0; i <= segments; i++) {
+                        const idx = (i / segments) * (data.length - 1);
+                        const x = chartLeft + (i / segments) * chartWidth;
+                        const days = (i / segments) * regression.lastDays;
+                        const y = yScale(regression.predictDays(days));
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // Extend trend curve to target if heading in right direction
+                    if (targetWeight && !isNaN(targetWeight)) {
+                        const currentWeight = data[data.length - 1].weight;
+                        const isLosingWeight = regression.currentSlope < 0;
+                        const needToLose = currentWeight > targetWeight;
+                        
+                        if ((isLosingWeight && needToLose) || (!isLosingWeight && !needToLose)) {
+                            const predictedDate = regression.predictDate(targetWeight);
+                            
+                            // Draw extension if in future
+                            if (predictedDate && predictedDate > data[data.length - 1].date) {
+                                const futureDays = (predictedDate.getTime() - regression.firstDate) / (1000 * 60 * 60 * 24);
+                                const extrapolationDays = futureDays - regression.lastDays;
+                                const maxExtrapolation = regression.lastDays * 0.5; // Max 50% extension
+                                const actualExtra = Math.min(extrapolationDays, maxExtrapolation);
+                                
+                                ctx.strokeStyle = '#f59e0b40';
+                                ctx.lineWidth = 2;
+                                ctx.setLineDash([6, 3]);
+                                ctx.beginPath();
+                                
+                                const extSegments = 20;
+                                for (let i = 0; i <= extSegments; i++) {
+                                    const days = regression.lastDays + (i / extSegments) * actualExtra;
+                                    const progress = i / extSegments;
+                                    const x = chartRight + progress * (chartWidth * 0.15);
+                                    const y = yScale(regression.predictDays(days));
+                                    const clampedY = Math.max(chartTop, Math.min(chartBottom, y));
+                                    
+                                    if (i === 0) {
+                                        ctx.moveTo(x, clampedY);
+                                    } else {
+                                        ctx.lineTo(x, clampedY);
+                                    }
+                                }
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                            }
+                        }
+                    }
+                    
+                    // Show current weekly rate (instantaneous at last point)
+                    const weeklyRate = regression.currentSlope * 7;
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.font = '11px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'left';
+                    const rateSign = weeklyRate >= 0 ? '+' : '';
+                    ctx.fillText(`Trend: ${rateSign}${weeklyRate.toFixed(2)} kg/week`, chartRight - 140, chartTop + 12);
+                }
+                
+                // Draw line
+                ctx.beginPath();
+                ctx.strokeStyle = '#3baef9';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                data.forEach((d, i) => {
+                    const x = xScale(i);
+                    const y = yScale(d.weight);
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+                
+                // Draw points
+                data.forEach((d, i) => {
+                    const x = xScale(i);
+                    const y = yScale(d.weight);
+                    
+                    ctx.beginPath();
+                    ctx.fillStyle = '#111425';
+                    ctx.arc(x, y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.fillStyle = '#3baef9';
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                // X-axis labels (show some labels to avoid crowding)
+                const maxLabels = 12;
+                const step = Math.max(1, Math.floor(data.length / maxLabels));
+                
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '11px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                
+                data.forEach((d, i) => {
+                    if (i % step === 0 || i === data.length - 1) {
+                        const x = xScale(i);
+                        ctx.save();
+                        ctx.translate(x, chartBottom + 15);
+                        ctx.rotate(-Math.PI / 4);
+                        ctx.fillText(formatDate(d.date), 0, 0);
+                        ctx.restore();
+                    }
+                });
+                
+                // Stats
+                const currentWeight = data[data.length - 1].weight;
+                const startWeight = data[0].weight;
+                const change = currentWeight - startWeight;
+                const changeSign = change >= 0 ? '+' : '';
+                
+                ctx.font = '14px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText(`Current: ${currentWeight.toFixed(1)} kg`, chartLeft, height - 15);
+                ctx.fillStyle = change <= 0 ? '#4ade80' : '#f87171';
+                ctx.fillText(`Change: ${changeSign}${change.toFixed(1)} kg`, chartLeft + 150, height - 15);
+                
+                // Show target prediction
+                if (showTrend && regression && targetWeight && !isNaN(targetWeight)) {
+                    const currentWeight = data[data.length - 1].weight;
+                    const isLosingWeight = regression.currentSlope < 0;
+                    const needToLose = currentWeight > targetWeight;
+                    
+                    if ((isLosingWeight && needToLose) || (!isLosingWeight && !needToLose)) {
+                        const predictedDate = regression.predictDate(targetWeight);
+                        if (predictedDate && predictedDate > new Date()) {
+                            ctx.fillStyle = '#f59e0b';
+                            ctx.fillText(`Target by: ${formatDateLocale(predictedDate)}`, chartLeft + 320, height - 15);
+                        }
+                    } else {
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.fillText('Trend moving away from target', chartLeft + 320, height - 15);
+                    }
+                }
+                
+            }, [data, title, targetWeight, showTrend, regression]);
+            
+            return (
+                <div className="flex items-center justify-center">
+                    <canvas ref={canvasRef} style={{borderRadius: '12px'}} />
+                </div>
+            );
+        };
+
+        // --- Canvas Bar Chart Renderer ---
+        const CanvasBarChart = ({ data, canvasRef, title, granularity }) => {
+            const [tooltip, setTooltip] = useState(null);
+            const barRectsRef = useRef([]);
+            
+            useEffect(() => {
+                if (!data || data.length === 0 || !canvasRef.current) return;
+                
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                
+                const width = 900;
+                const height = 500;
+                const padding = { top: 60, right: 50, bottom: 100, left: 70 };
+                
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
+                ctx.scale(dpr, dpr);
+                
+                // Background
+                ctx.fillStyle = '#111425';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Title
+                const granularityLabel = BAR_GRANULARITIES.find(g => g.value === granularity)?.label || '';
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 20px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(title || `${granularityLabel} Average Weight`, width / 2, 35);
+                
+                // Chart area
+                const chartLeft = padding.left;
+                const chartRight = width - padding.right;
+                const chartTop = padding.top;
+                const chartBottom = height - padding.bottom;
+                const chartWidth = chartRight - chartLeft;
+                const chartHeight = chartBottom - chartTop;
+                
+                // Calculate scales
+                const averages = data.map(d => d.average);
+                const minWeight = Math.floor(Math.min(...averages) - 1);
+                const maxWeight = Math.ceil(Math.max(...averages) + 1);
+                const weightRange = maxWeight - minWeight;
+                
+                const barWidth = Math.min(50, (chartWidth / data.length) - 10);
+                const barGap = (chartWidth - barWidth * data.length) / (data.length + 1);
+                
+                // Store bar rectangles for hover detection
+                const barRects = [];
+                
+                const yScale = (w) => chartBottom - ((w - minWeight) / weightRange) * chartHeight;
+                
+                // Grid lines
+                ctx.strokeStyle = '#2d3755';
+                ctx.lineWidth = 1;
+                
+                const ySteps = 5;
+                for (let i = 0; i <= ySteps; i++) {
+                    const y = chartBottom - (i / ySteps) * chartHeight;
+                    ctx.beginPath();
+                    ctx.moveTo(chartLeft, y);
+                    ctx.lineTo(chartRight, y);
+                    ctx.stroke();
+                    
+                    const weight = minWeight + (i / ySteps) * weightRange;
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '12px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(weight.toFixed(1) + ' kg', chartLeft - 10, y + 4);
+                }
+                
+                // Draw vertical month/year markers for bar chart
+                if (granularity === 'week' || granularity === 'month') {
+                    let prevPeriod = null;
+                    data.forEach((d, i) => {
+                        // Parse the label to get period info
+                        let currentPeriod;
+                        if (granularity === 'week') {
+                            // Label format: YYYY-Wnn - mark at year change or every ~4 weeks for month
+                            const match = d.label.match(/(\d{4})-W(\d{2})/);
+                            if (match) {
+                                const year = parseInt(match[1]);
+                                const week = parseInt(match[2]);
+                                // Mark at beginning of year or roughly at month boundaries (every 4-5 weeks)
+                                currentPeriod = year * 12 + Math.floor((week - 1) / 4);
+                            }
+                        } else if (granularity === 'month') {
+                            // Label format: YYYY-MM - mark at year change
+                            const match = d.label.match(/(\d{4})-(\d{2})/);
+                            if (match) {
+                                currentPeriod = parseInt(match[1]); // Just year
+                            }
+                        }
+                        
+                        if (prevPeriod !== null && currentPeriod !== prevPeriod && currentPeriod !== undefined) {
+                            const x = chartLeft + barGap + i * (barWidth + barGap) - barGap / 2;
+                            ctx.strokeStyle = '#4b5563';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([4, 4]);
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartTop);
+                            ctx.lineTo(x, chartBottom);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        }
+                        prevPeriod = currentPeriod;
+                    });
+                }
+                
+                // Draw bars
+                data.forEach((d, i) => {
+                    const x = chartLeft + barGap + i * (barWidth + barGap);
+                    const barHeight = ((d.average - minWeight) / weightRange) * chartHeight;
+                    const y = chartBottom - barHeight;
+                    
+                    // Store bar rect for hover detection
+                    barRects.push({
+                        x, y, width: barWidth, height: barHeight,
+                        data: d
+                    });
+                    
+                    // Bar
+                    ctx.fillStyle = '#3baef9';
+                    const radius = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(x, chartBottom);
+                    ctx.lineTo(x, y + radius);
+                    ctx.quadraticCurveTo(x, y, x + radius, y);
+                    ctx.lineTo(x + barWidth - radius, y);
+                    ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+                    ctx.lineTo(x + barWidth, chartBottom);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Value on bar
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(d.average.toFixed(1), x + barWidth / 2, y - 8);
+                    
+                    // Entry count indicator (small text showing n entries)
+                    if (d.count > 0) {
+                        ctx.fillStyle = '#64748b';
+                        ctx.font = '9px Inter, system-ui, sans-serif';
+                        ctx.fillText(`(${d.count})`, x + barWidth / 2, y - 20);
+                    }
+                    
+                    // X-axis labels
+                    ctx.save();
+                    ctx.translate(x + barWidth / 2, chartBottom + 15);
+                    ctx.rotate(-Math.PI / 4);
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '11px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(d.label, 0, 0);
+                    ctx.restore();
+                });
+                
+                // Stats
+                if (data.length > 0) {
+                    const currentAvg = data[data.length - 1].average;
+                    const startAvg = data[0].average;
+                    const change = currentAvg - startAvg;
+                    const changeSign = change >= 0 ? '+' : '';
+                    
+                    ctx.font = '14px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillText(`Latest Avg: ${currentAvg.toFixed(1)} kg`, chartLeft, height - 15);
+                    ctx.fillStyle = change <= 0 ? '#4ade80' : '#f87171';
+                    ctx.fillText(`Change: ${changeSign}${change.toFixed(1)} kg`, chartLeft + 180, height - 15);
+                }
+                
+                // Store bar rects for mouse handling
+                barRectsRef.current = barRects;
+                
+            }, [data, title, granularity]);
+            
+            // Mouse event handlers
+            const handleMouseMove = useCallback((e) => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Check if mouse is over any bar
+                const hoveredBar = barRectsRef.current.find(bar => 
+                    x >= bar.x && x <= bar.x + bar.width &&
+                    y >= bar.y && y <= bar.y + bar.height
+                );
+                
+                if (hoveredBar) {
+                    setTooltip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        data: hoveredBar.data
+                    });
+                } else {
+                    setTooltip(null);
+                }
+            }, [canvasRef]);
+            
+            const handleMouseLeave = useCallback(() => {
+                setTooltip(null);
+            }, []);
+            
+            return (
+                <div className="flex items-center justify-center relative">
+                    <canvas 
+                        ref={canvasRef} 
+                        style={{borderRadius: '12px', cursor: tooltip ? 'pointer' : 'default'}} 
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                    />
+                    {tooltip && (
+                        <div 
+                            className="fixed bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-xl z-50 pointer-events-none"
+                            style={{
+                                left: tooltip.x + 15,
+                                top: tooltip.y - 10,
+                            }}
+                        >
+                            <div className="text-sm font-semibold text-white mb-1">{tooltip.data.label}</div>
+                            <div className="text-xs text-slate-400">
+                                <div>From: {formatDateLocale(tooltip.data.firstDate)}</div>
+                                <div>To: {formatDateLocale(tooltip.data.lastDate)}</div>
+                                <div className="mt-1 text-slate-300">Avg: {tooltip.data.average.toFixed(1)} kg ({tooltip.data.count} entries)</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Spreadsheet Editor Component ---
+        const SpreadsheetEditor = ({ data, onUpdate, onFilterFromDate }) => {
+            const [rows, setRows] = useState([]);
+
+            useEffect(() => {
+                setRows(parseCSV(data));
+            }, [data]);
+
+            const handleCellChange = (rIdx, cIdx, value) => {
+                const newRows = [...rows];
+                newRows[rIdx] = [...newRows[rIdx]];
+                newRows[rIdx][cIdx] = value;
+                setRows(newRows);
+                onUpdate(toCSV(newRows));
+            };
+
+            const addRow = () => {
+                const today = formatDate(new Date());
+                const newRow = [today, ''];
+                const newRows = [...rows, newRow];
+                setRows(newRows);
+                onUpdate(toCSV(newRows));
+            };
+
+            const removeRow = (idx) => {
+                if (rows.length <= 2) return;
+                const newRows = rows.filter((_, i) => i !== idx);
+                setRows(newRows);
+                onUpdate(toCSV(newRows));
+            };
+
+            if (!rows.length) return null;
+
+            return (
+                <div className="flex flex-col h-full gap-2">
+                    <div className="flex-1 sheet-grid overflow-auto" style={{ gridTemplateColumns: `1fr 1fr auto` }}>
+                        {/* Headers */}
+                        <div className="sheet-cell sheet-header flex items-center justify-center">
+                            <span>Date</span>
+                        </div>
+                        <div className="sheet-cell sheet-header flex items-center justify-center">
+                            <span>Weight (kg)</span>
+                        </div>
+                        <div className="sheet-cell sheet-header flex items-center justify-center" style={{minWidth: '70px'}}>
+                            <span></span>
+                        </div>
+
+                        {/* Data Rows */}
+                        {rows.slice(1).map((row, rIdx) => (
+                            <React.Fragment key={`r-${rIdx}`}>
+                                <div className="sheet-cell">
+                                    <input 
+                                        type="date"
+                                        value={row[0] || ''} 
+                                        onChange={(e) => handleCellChange(rIdx + 1, 0, e.target.value)}
+                                    />
+                                </div>
+                                <div className="sheet-cell">
+                                    <input 
+                                        type="number"
+                                        step="0.1"
+                                        value={row[1] || ''} 
+                                        onChange={(e) => handleCellChange(rIdx + 1, 1, e.target.value)}
+                                        placeholder="e.g. 75.5"
+                                    />
+                                </div>
+                                <div className="sheet-cell flex items-center justify-center gap-1" style={{minWidth: '70px'}}>
+                                    <button 
+                                        onClick={() => onFilterFromDate && onFilterFromDate(row[0])} 
+                                        className="text-blue-400 hover:text-blue-300 p-1"
+                                        title="Filter from this date"
+                                    >
+                                        <Filter size={12} />
+                                    </button>
+                                    <button 
+                                        onClick={() => removeRow(rIdx + 1)} 
+                                        className="text-red-500 hover:text-red-400 p-1"
+                                        title="Remove row"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                    <button 
+                        onClick={addRow} 
+                        className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium flex items-center justify-center gap-2"
+                    >
+                        <Plus size={14} /> Add Entry
+                    </button>
+                </div>
+            );
+        };
+
+        // --- Toast Component ---
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+            
+            const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+            
+            return (
+                <div className={`fixed bottom-6 right-6 ${bgColor} text-white px-6 py-3 rounded-lg shadow-xl z-[100] flex items-center gap-3 animate-fade-in`}>
+                    <span>{message}</span>
+                    <button onClick={onClose} className="hover:opacity-70">
+                        <X size={16} />
+                    </button>
+                </div>
+            );
+        };
+
+        // --- Help Modal Component ---
+        const HelpModal = ({ onClose }) => (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+                <div 
+                    className="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl border border-slate-600"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center p-4 border-b border-slate-700">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <HelpCircle size={20} className="text-blue-400" />
+                            Weight Tracker Help
+                        </h2>
+                        <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
+                            <X size={20} />
+                        </button>
+                    </div>
+                    <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)] space-y-6 text-slate-300">
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Quick Start</h3>
+                            <ol className="list-decimal list-inside space-y-1 text-sm">
+                                <li>Add your weight entries with dates in the table</li>
+                                <li>Choose between Line Chart or Bar Chart view</li>
+                                <li>Use date filters to focus on specific time periods</li>
+                                <li>For bar charts, select granularity (week/month/quarter/year)</li>
+                            </ol>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Data Format (CSV)</h3>
+                            <div className="bg-slate-900 p-3 rounded font-mono text-xs">
+                                Date,Weight<br/>
+                                2026-01-01,85.5<br/>
+                                2026-01-08,85.2<br/>
+                                2026-01-15,84.8
+                            </div>
+                            <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+                                <li><strong>Date:</strong> YYYY-MM-DD format</li>
+                                <li><strong>Weight:</strong> Weight in kilograms (decimals supported)</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Google Sheets Import</h3>
+                            <ol className="list-decimal list-inside space-y-1 text-sm">
+                                <li>Create a Google Sheet with Date and Weight columns</li>
+                                <li>Set sharing to "Anyone with the link can view"</li>
+                                <li>Paste the URL and click Fetch</li>
+                            </ol>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Chart Types</h3>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                                <li><strong>Line Chart:</strong> Shows individual weight measurements over time</li>
+                                <li><strong>Bar Chart:</strong> Shows average weight per time period (week/month/quarter/year)</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h3 className="text-lg font-semibold text-blue-400 mb-2">Keyboard Shortcuts</h3>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div><kbd className="bg-slate-700 px-2 py-0.5 rounded">⌘/Ctrl + Z</kbd></div>
+                                <div>Undo</div>
+                                <div><kbd className="bg-slate-700 px-2 py-0.5 rounded">⌘/Ctrl + Shift + Z</kbd></div>
+                                <div>Redo</div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- Main App Component ---
+        function App() {
+            // State
+            const [rawData, setRawData] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.rawData);
+                return saved !== null ? saved : DEFAULT_DATA;
+            });
+            const [chartType, setChartType] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.chartType);
+                return saved || 'line';
+            });
+            const [barGranularity, setBarGranularity] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.barGranularity);
+                return saved || 'week';
+            });
+            const [dateFilter, setDateFilter] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.dateFilter);
+                return saved || 'all';
+            });
+            const [customStartDate, setCustomStartDate] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.customStartDate);
+                return saved || '';
+            });
+            const [sheetUrl, setSheetUrl] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.sheetUrl);
+                return saved || '';
+            });
+            const [isRawMode, setIsRawMode] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.isRawMode);
+                return saved ? JSON.parse(saved) : false;
+            });
+            const [targetWeight, setTargetWeight] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.targetWeight);
+                return saved || '';
+            });
+            const [showTrend, setShowTrend] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEYS.showTrend);
+                return saved ? JSON.parse(saved) : true;
+            });
+            const [isLoading, setIsLoading] = useState(false);
+            const [errorMsg, setErrorMsg] = useState('');
+            const [isFullScreen, setIsFullScreen] = useState(false);
+            const [toast, setToast] = useState(null);
+            const [showHelp, setShowHelp] = useState(false);
+            
+            // Undo/Redo
+            const [dataHistory, setDataHistory] = useState([]);
+            const [dataFuture, setDataFuture] = useState([]);
+            
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+            const garminInputRef = useRef(null);
+            
+            const showToast = useCallback((message, type = 'success') => {
+                setToast({ message, type });
+            }, []);
+            
+            const setRawDataWithHistory = useCallback((newData) => {
+                setDataHistory(prev => [...prev.slice(-49), rawData]);
+                setDataFuture([]);
+                setRawData(newData);
+            }, [rawData]);
+            
+            const handleUndo = useCallback(() => {
+                if (dataHistory.length === 0) return;
+                const previous = dataHistory[dataHistory.length - 1];
+                setDataHistory(prev => prev.slice(0, -1));
+                setDataFuture(prev => [rawData, ...prev]);
+                setRawData(previous);
+                showToast('Undo successful');
+            }, [dataHistory, rawData, showToast]);
+            
+            const handleRedo = useCallback(() => {
+                if (dataFuture.length === 0) return;
+                const next = dataFuture[0];
+                setDataFuture(prev => prev.slice(1));
+                setDataHistory(prev => [...prev, rawData]);
+                setRawData(next);
+                showToast('Redo successful');
+            }, [dataFuture, rawData, showToast]);
+            
+            // Keyboard shortcuts
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            handleRedo();
+                        } else {
+                            handleUndo();
+                        }
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [handleUndo, handleRedo]);
+            
+            // Save to localStorage
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.rawData, rawData); }, [rawData]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.chartType, chartType); }, [chartType]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.barGranularity, barGranularity); }, [barGranularity]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.dateFilter, dateFilter); }, [dateFilter]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.customStartDate, customStartDate); }, [customStartDate]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.sheetUrl, sheetUrl); }, [sheetUrl]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.isRawMode, JSON.stringify(isRawMode)); }, [isRawMode]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.targetWeight, targetWeight); }, [targetWeight]);
+            useEffect(() => { localStorage.setItem(STORAGE_KEYS.showTrend, JSON.stringify(showTrend)); }, [showTrend]);
+            
+            // Parse and process data
+            const processedData = useMemo(() => {
+                const rows = parseCSV(rawData);
+                if (rows.length < 2) return [];
+                
+                const data = rows.slice(1)
+                    .map(row => {
+                        const date = parseDate(row[0]);
+                        const weight = parseFloat(row[1]);
+                        if (date && !isNaN(weight)) {
+                            return { date, weight };
+                        }
+                        return null;
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => a.date - b.date);
+                
+                // Apply date filter
+                const filterStart = getFilterStartDate(dateFilter, customStartDate);
+                if (filterStart) {
+                    return data.filter(d => d.date >= filterStart);
+                }
+                
+                return data;
+            }, [rawData, dateFilter, customStartDate]);
+            
+            const barChartData = useMemo(() => {
+                if (processedData.length === 0) return [];
+                return groupByGranularity(processedData, barGranularity);
+            }, [processedData, barGranularity]);
+            
+            // Google Sheets fetch
+            const handleSheetFetch = async () => {
+                if (!sheetUrl) return;
+                setIsLoading(true);
+                setErrorMsg('');
+
+                try {
+                    const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                    if (!match || !match[1]) {
+                        throw new Error("Invalid Google Sheet URL. Could not find Sheet ID.");
+                    }
+                    const sheetId = match[1];
+                    const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                    
+                    const response = await fetch(exportUrl);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch. Status: ${response.status}`);
+                    }
+
+                    const text = await response.text();
+                    setRawDataWithHistory(text);
+                    showToast('Data imported from Google Sheets!');
+                } catch (err) {
+                    console.error(err);
+                    setErrorMsg(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            // Download chart
+            const handleDownloadImage = () => {
+                if (!canvasRef.current) {
+                    showToast("Chart not ready.", "error");
+                    return;
+                }
+                
+                try {
+                    const dataUrl = canvasRef.current.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = `weight-tracker-${formatDate(new Date())}.png`;
+                    link.href = dataUrl;
+                    link.click();
+                    showToast('Chart downloaded!');
+                } catch (e) {
+                    console.error("Download failed", e);
+                    showToast("Failed to generate image.", "error");
+                }
+            };
+            
+            // Copy to clipboard
+            const handleCopyToClipboard = async () => {
+                if (!canvasRef.current) {
+                    showToast("Chart not ready.", "error");
+                    return;
+                }
+                
+                try {
+                    const canvas = canvasRef.current;
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    showToast('Chart copied to clipboard!');
+                } catch (e) {
+                    console.error("Copy failed", e);
+                    showToast("Failed to copy to clipboard.", "error");
+                }
+            };
+            
+            // Save/Load project
+            const handleSaveToFile = () => {
+                const projectData = {
+                    version: 1,
+                    rawData,
+                    chartType,
+                    barGranularity,
+                    dateFilter,
+                    customStartDate,
+                };
+                const json = JSON.stringify(projectData, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `weight-tracker-${formatDate(new Date())}.json`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+                showToast('Project saved!');
+            };
+            
+            const handleLoadFromFile = (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.rawData) setRawDataWithHistory(data.rawData);
+                        if (data.chartType) setChartType(data.chartType);
+                        if (data.barGranularity) setBarGranularity(data.barGranularity);
+                        if (data.dateFilter) setDateFilter(data.dateFilter);
+                        if (data.customStartDate) setCustomStartDate(data.customStartDate);
+                        showToast('Project loaded!');
+                    } catch (err) {
+                        showToast('Failed to load project file.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+            
+            // Garmin CSV import
+            const handleGarminImport = (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const text = e.target.result;
+                        const lines = text.trim().split('\n');
+                        
+                        // Garmin format: date line like " Feb 11, 2026," followed by measurement lines
+                        const monthMap = {
+                            'gen': '01', 'jan': '01',
+                            'feb': '02',
+                            'mar': '03',
+                            'apr': '04',
+                            'mag': '05', 'may': '05',
+                            'giu': '06', 'jun': '06',
+                            'lug': '07', 'jul': '07',
+                            'ago': '08', 'aug': '08',
+                            'set': '09', 'sep': '09',
+                            'ott': '10', 'oct': '10',
+                            'nov': '11',
+                            'dic': '12', 'dec': '12',
+                        };
+                        
+                        const entries = {};
+                        let currentDate = null;
+                        
+                        for (let i = 1; i < lines.length; i++) { // Skip header
+                            const line = lines[i].trim();
+                            if (!line) continue;
+                            
+                            // Check if this is a date line (starts with month name, no time)
+                            const dateMatch = line.match(/^\s*"?\s*([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/i);
+                            if (dateMatch) {
+                                const monthStr = dateMatch[1].toLowerCase().substring(0, 3);
+                                const day = dateMatch[2].padStart(2, '0');
+                                const year = dateMatch[3];
+                                const month = monthMap[monthStr];
+                                
+                                if (month) {
+                                    currentDate = `${year}-${month}-${day}`;
+                                }
+                                continue;
+                            }
+                            
+                            // Check if this is a measurement line (starts with time)
+                            const measureMatch = line.match(/^(\d{1,2}:\d{2}\s*(?:AM|PM)?)\s*,\s*([\d.]+)\s*kg/i);
+                            if (measureMatch && currentDate) {
+                                const weight = parseFloat(measureMatch[2]);
+                                if (!isNaN(weight) && !entries[currentDate]) {
+                                    // Only keep the first (most recent) entry for each date
+                                    entries[currentDate] = weight;
+                                }
+                            }
+                        }
+                        
+                        // Convert to sorted CSV
+                        const sortedDates = Object.keys(entries).sort();
+                        if (sortedDates.length === 0) {
+                            throw new Error('No valid weight data found in Garmin CSV');
+                        }
+                        
+                        const newRows = ['Date,Weight'];
+                        sortedDates.forEach(date => {
+                            newRows.push(`${date},${entries[date]}`);
+                        });
+                        
+                        setRawDataWithHistory(newRows.join('\n'));
+                        showToast(`Imported ${sortedDates.length} entries from Garmin!`);
+                    } catch (err) {
+                        console.error(err);
+                        showToast(err.message || 'Failed to import Garmin CSV.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+
+            return (
+                <div className="flex flex-col h-screen">
+                    {/* Toast */}
+                    {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+                    
+                    {/* Help Modal */}
+                    {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+                    {/* Header */}
+                    {!isFullScreen && (
+                    <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-3">
+                            <Scale size={24} className="text-blue-400" />
+                            <h1 className="text-xl font-bold">Weight Tracker</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={handleUndo}
+                                disabled={dataHistory.length === 0}
+                                className="p-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Undo (⌘Z)"
+                            >
+                                <Undo size={18} />
+                            </button>
+                            <button 
+                                onClick={handleRedo}
+                                disabled={dataFuture.length === 0}
+                                className="p-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Redo (⌘⇧Z)"
+                            >
+                                <Redo size={18} />
+                            </button>
+                            <div className="w-px h-6 bg-slate-600 mx-1"></div>
+                            <button 
+                                onClick={() => setShowHelp(true)}
+                                className="p-2 text-slate-400 hover:text-white"
+                                title="Help"
+                            >
+                                <HelpCircle size={18} />
+                            </button>
+                            <button 
+                                onClick={() => setIsFullScreen(true)}
+                                className="p-2 text-slate-400 hover:text-white"
+                                title="Full Screen"
+                            >
+                                <Maximize size={18} />
+                            </button>
+                            <div className="w-px h-6 bg-slate-600 mx-1"></div>
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Load Project"
+                            >
+                                <FolderOpen size={16} /> <span className="hidden md:inline">Load</span>
+                            </button>
+                            <input 
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".json"
+                                onChange={handleLoadFromFile}
+                                className="hidden"
+                            />
+                            <button 
+                                onClick={handleSaveToFile}
+                                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Save Project"
+                            >
+                                <Save size={16} /> <span className="hidden md:inline">Save</span>
+                            </button>
+                            <div className="w-px h-6 bg-slate-600 mx-1"></div>
+                            <button 
+                                onClick={handleCopyToClipboard}
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Copy Chart"
+                            >
+                                <Clipboard size={16} /> <span className="hidden md:inline">Copy</span>
+                            </button>
+                            <button 
+                                onClick={handleDownloadImage}
+                                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white p-2 md:px-4 md:py-2 rounded-md text-sm font-medium transition-colors"
+                                title="Download Chart"
+                            >
+                                <Download size={16} /> <span className="hidden md:inline">Download</span>
+                            </button>
+                        </div>
+                    </header>
+                    )}
+
+                    <div className="flex flex-1 overflow-hidden">
+                        {/* Left Sidebar */}
+                        {!isFullScreen && (
+                        <div className="w-1/3 min-w-[350px] max-w-[450px] bg-slate-800 border-r border-slate-700 flex flex-col">
+                            <div className="p-4 space-y-4 overflow-auto flex-1">
+                                
+                                {/* Chart Type Selection */}
+                                <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                                    <div className="flex items-center gap-2 text-sm font-medium mb-3 text-blue-300">
+                                        <BarChart3 size={14} /> Chart Type
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setChartType('line')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${chartType === 'line' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                        >
+                                            <LineChartIcon size={16} /> Line
+                                        </button>
+                                        <button
+                                            onClick={() => setChartType('bar')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${chartType === 'bar' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                        >
+                                            <BarChart3 size={16} /> Bar
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Bar Granularity */}
+                                    {chartType === 'bar' && (
+                                        <div className="mt-3">
+                                            <label className="text-xs text-slate-400 mb-1 block">Granularity</label>
+                                            <select
+                                                value={barGranularity}
+                                                onChange={(e) => setBarGranularity(e.target.value)}
+                                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+                                            >
+                                                {BAR_GRANULARITIES.map(g => (
+                                                    <option key={g.value} value={g.value}>{g.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Line Chart Options */}
+                                    {chartType === 'line' && (
+                                        <div className="mt-3 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs text-slate-400">Show Trend Line</label>
+                                                <button
+                                                    onClick={() => setShowTrend(!showTrend)}
+                                                    className={`w-10 h-5 rounded-full transition-colors ${showTrend ? 'bg-blue-600' : 'bg-slate-600'}`}
+                                                >
+                                                    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${showTrend ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 mb-1 block">Target Weight (kg)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={targetWeight}
+                                                    onChange={(e) => setTargetWeight(e.target.value)}
+                                                    placeholder="e.g. 75"
+                                                    className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Date Filter */}
+                                <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                                    <div className="flex items-center gap-2 text-sm font-medium mb-3 text-blue-300">
+                                        <Filter size={14} /> Date Filter
+                                    </div>
+                                    <select
+                                        value={dateFilter}
+                                        onChange={(e) => setDateFilter(e.target.value)}
+                                        className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+                                    >
+                                        {DATE_FILTERS.map(f => (
+                                            <option key={f.value} value={f.value}>{f.label}</option>
+                                        ))}
+                                    </select>
+                                    
+                                    {dateFilter === 'custom' && (
+                                        <div className="mt-2">
+                                            <input
+                                                type="date"
+                                                value={customStartDate}
+                                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+                                            />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="mt-2 text-xs text-slate-400">
+                                        Showing {processedData.length} entries
+                                    </div>
+                                </div>
+
+                                {/* Google Sheets Import */}
+                                <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                                    <div className="flex items-center gap-2 text-sm font-medium mb-2 text-blue-300">
+                                        <LinkIcon size={14} /> Google Sheets Import
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-xs focus:border-blue-500 outline-none"
+                                            placeholder="Paste Google Sheet URL..."
+                                            value={sheetUrl}
+                                            onChange={(e) => setSheetUrl(e.target.value)}
+                                        />
+                                        <button 
+                                            onClick={handleSheetFetch}
+                                            disabled={isLoading}
+                                            className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50"
+                                        >
+                                            {isLoading ? '...' : 'Fetch'}
+                                        </button>
+                                    </div>
+                                    {errorMsg && <div className="text-red-400 text-xs mt-2">{errorMsg}</div>}
+                                </div>
+                                
+                                {/* Garmin Import */}
+                                <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                                    <div className="flex items-center gap-2 text-sm font-medium mb-2 text-blue-300">
+                                        <Upload size={14} /> Import from Garmin CSV
+                                    </div>
+                                    <button 
+                                        onClick={() => garminInputRef.current?.click()}
+                                        className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium"
+                                    >
+                                        Select Garmin CSV File
+                                    </button>
+                                    <input 
+                                        ref={garminInputRef}
+                                        type="file"
+                                        accept=".csv"
+                                        onChange={handleGarminImport}
+                                        className="hidden"
+                                    />
+                                    <div className="text-xs text-slate-500 mt-1">
+                                        Export weight data from Garmin Connect
+                                    </div>
+                                </div>
+
+                                {/* Data Editor */}
+                                <div className="flex-1 flex flex-col min-h-0">
+                                    <div className="flex justify-between items-center text-sm font-medium mb-2 text-blue-300">
+                                        <div className="flex items-center gap-2">
+                                            <Table2 size={14} /> Weight Data
+                                        </div>
+                                        <button 
+                                            onClick={() => setIsRawMode(!isRawMode)}
+                                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
+                                        >
+                                            {isRawMode ? <Table2 size={12}/> : <FileText size={12}/>}
+                                            {isRawMode ? "Grid View" : "Raw CSV"}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="flex-1 min-h-[200px] max-h-[400px] overflow-auto">
+                                        {isRawMode ? (
+                                            <textarea 
+                                                className="w-full h-full bg-slate-900 border border-slate-600 rounded p-3 font-mono text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none"
+                                                value={rawData}
+                                                onChange={(e) => setRawDataWithHistory(e.target.value)}
+                                                placeholder="Paste CSV data here..."
+                                            />
+                                        ) : (
+                                            <SpreadsheetEditor 
+                                                data={rawData} 
+                                                onUpdate={setRawDataWithHistory}
+                                                onFilterFromDate={(date) => {
+                                                    setDateFilter('custom');
+                                                    setCustomStartDate(date);
+                                                    showToast(`Filtering from ${date}`);
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        )}
+
+                        {/* Chart Area */}
+                        <div className="flex-1 bg-slate-900 p-8 overflow-auto flex items-center justify-center relative">
+                            <div className="absolute inset-0 opacity-5 pointer-events-none" 
+                                style={{backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
+                            </div>
+
+                            {isFullScreen && (
+                                <button 
+                                    onClick={() => setIsFullScreen(false)}
+                                    className="absolute top-4 right-4 z-50 bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                                    title="Exit Full Screen"
+                                >
+                                    <Minimize size={20} />
+                                </button>
+                            )}
+
+                            {processedData.length > 0 ? (
+                                chartType === 'line' ? (
+                                    <CanvasLineChart 
+                                        data={processedData} 
+                                        canvasRef={canvasRef}
+                                        title="Weight Over Time"
+                                        targetWeight={parseFloat(targetWeight)}
+                                        showTrend={showTrend}
+                                    />
+                                ) : (
+                                    <CanvasBarChart 
+                                        data={barChartData} 
+                                        canvasRef={canvasRef}
+                                        title={`${BAR_GRANULARITIES.find(g => g.value === barGranularity)?.label || ''} Average Weight`}
+                                        granularity={barGranularity}
+                                    />
+                                )
+                            ) : (
+                                <div className="text-slate-500 text-center">
+                                    <Scale size={48} className="mx-auto mb-4 opacity-50" />
+                                    <p>No weight data to display</p>
+                                    <p className="text-sm mt-2">Add entries in the table or import from Google Sheets</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
