@@ -202,6 +202,27 @@
         const toCSV = (rows) => {
             return rows.map(r => r.join(',')).join('\n');
         };
+        
+        // Sort CSV data by date (oldest to newest)
+        const sortCSVByDate = (csvStr) => {
+            const rows = parseCSV(csvStr);
+            if (rows.length <= 1) return csvStr; // Only header or empty
+            
+            const header = rows[0];
+            const dataRows = rows.slice(1);
+            
+            // Sort by first column (date)
+            dataRows.sort((a, b) => {
+                const dateA = new Date(a[0]);
+                const dateB = new Date(b[0]);
+                // Handle invalid dates by keeping original order
+                if (isNaN(dateA.getTime())) return 1;
+                if (isNaN(dateB.getTime())) return -1;
+                return dateA - dateB;
+            });
+            
+            return toCSV([header, ...dataRows]);
+        };
 
         // Quadratic regression calculation for curved trend
         const calculateQuadraticRegression = (data) => {
@@ -968,10 +989,25 @@
         // --- Spreadsheet Editor Component ---
         const SpreadsheetEditor = ({ data, onUpdate, onFilterFromDate }) => {
             const [rows, setRows] = useState([]);
+            const gridRef = useRef(null);
+            const hasScrolledRef = useRef(false);
 
             useEffect(() => {
                 setRows(parseCSV(data));
             }, [data]);
+            
+            // Scroll to bottom on initial load only
+            useEffect(() => {
+                if (rows.length > 1 && !hasScrolledRef.current) {
+                    const timer = setTimeout(() => {
+                        if (gridRef.current) {
+                            gridRef.current.scrollTop = gridRef.current.scrollHeight;
+                            hasScrolledRef.current = true;
+                        }
+                    }, 100);
+                    return () => clearTimeout(timer);
+                }
+            }, [rows]);
 
             const handleCellChange = (rIdx, cIdx, value) => {
                 const newRows = [...rows];
@@ -999,8 +1035,8 @@
             if (!rows.length) return null;
 
             return (
-                <div className="flex flex-col h-full gap-2">
-                    <div className="flex-1 sheet-grid overflow-auto" style={{ gridTemplateColumns: `1fr 1fr auto` }}>
+                <div className="flex flex-col h-full gap-2 min-h-0">
+                    <div ref={gridRef} className="flex-1 sheet-grid overflow-auto min-h-0" style={{ gridTemplateColumns: `1fr 1fr auto` }}>
                         {/* Headers */}
                         <div className="sheet-cell sheet-header flex items-center justify-center">
                             <span>Date</span>
@@ -1052,7 +1088,7 @@
                     </div>
                     <button 
                         onClick={addRow} 
-                        className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium flex items-center justify-center gap-2"
+                        className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-medium flex items-center justify-center gap-2 shrink-0"
                     >
                         <Plus size={14} /> Add Entry
                     </button>
@@ -1152,7 +1188,7 @@
             // State
             const [rawData, setRawData] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEYS.rawData);
-                return saved !== null ? saved : DEFAULT_DATA;
+                return sortCSVByDate(saved !== null ? saved : DEFAULT_DATA);
             });
             const [chartType, setChartType] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEYS.chartType);
@@ -1306,7 +1342,7 @@
                     }
 
                     const text = await response.text();
-                    setRawDataWithHistory(text);
+                    setRawDataWithHistory(sortCSVByDate(text));
                     showToast('Data imported from Google Sheets!');
                 } catch (err) {
                     console.error(err);
@@ -1385,7 +1421,7 @@
                 reader.onload = (e) => {
                     try {
                         const data = JSON.parse(e.target.result);
-                        if (data.rawData) setRawDataWithHistory(data.rawData);
+                        if (data.rawData) setRawDataWithHistory(sortCSVByDate(data.rawData));
                         if (data.chartType) setChartType(data.chartType);
                         if (data.barGranularity) setBarGranularity(data.barGranularity);
                         if (data.dateFilter) setDateFilter(data.dateFilter);
@@ -1571,9 +1607,11 @@
                     <div className="flex flex-1 overflow-hidden">
                         {/* Left Sidebar */}
                         {!isFullScreen && (
-                        <div className="w-1/3 min-w-[350px] max-w-[450px] bg-slate-800 border-r border-slate-700 flex flex-col">
-                            <div className="p-4 space-y-4 overflow-auto flex-1">
+                        <div className="w-1/3 min-w-[350px] max-w-[450px] bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden">
+                            <div className="p-4 space-y-4 flex flex-col flex-1 min-h-0 overflow-hidden">
                                 
+                                {/* Options section - no scroll */}
+                                <div className="space-y-4 shrink-0">
                                 {/* Chart Type Selection */}
                                 <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
                                     <div className="flex items-center gap-2 text-sm font-medium mb-3 text-blue-300">
@@ -1714,9 +1752,10 @@
                                         Export weight data from Garmin Connect
                                     </div>
                                 </div>
+                                </div>
 
                                 {/* Data Editor */}
-                                <div className="flex-1 flex flex-col min-h-0">
+                                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                                     <div className="flex justify-between items-center text-sm font-medium mb-2 text-blue-300">
                                         <div className="flex items-center gap-2">
                                             <Table2 size={14} /> Weight Data
@@ -1730,7 +1769,7 @@
                                         </button>
                                     </div>
                                     
-                                    <div className="flex-1 min-h-[200px] max-h-[400px] overflow-auto">
+                                    <div className="flex-1 min-h-0 overflow-hidden">
                                         {isRawMode ? (
                                             <textarea 
                                                 className="w-full h-full bg-slate-900 border border-slate-600 rounded p-3 font-mono text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none"
