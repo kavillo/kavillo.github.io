@@ -472,7 +472,15 @@
                 
                 const weightRange = maxWeight - minWeight;
                 
-                const xScale = (i) => chartLeft + (i / (data.length - 1)) * chartWidth;
+                // Time-based x-axis scaling (proportional to actual dates)
+                const minTime = data[0].date.getTime();
+                const maxTime = data[data.length - 1].date.getTime();
+                const timeRange = maxTime - minTime;
+                
+                const xScale = (date) => {
+                    if (timeRange === 0) return chartLeft + chartWidth / 2;
+                    return chartLeft + ((date.getTime() - minTime) / timeRange) * chartWidth;
+                };
                 const yScale = (w) => chartBottom - ((w - minWeight) / weightRange) * chartHeight;
                 
                 // Grid lines
@@ -496,12 +504,16 @@
                     ctx.fillText(weight.toFixed(1) + ' kg', chartLeft - 10, y + 4);
                 }
                 
-                // Draw vertical month markers
-                let prevMonth = null;
-                data.forEach((d, i) => {
-                    const currentMonth = d.date.getFullYear() * 12 + d.date.getMonth();
-                    if (prevMonth !== null && currentMonth !== prevMonth) {
-                        const x = xScale(i);
+                // Draw vertical month markers at the start of each month
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const startDate = data[0].date;
+                const endDate = data[data.length - 1].date;
+                
+                // Find all month boundaries in the date range
+                let currentDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+                while (currentDate <= endDate) {
+                    const x = xScale(currentDate);
+                    if (x > chartLeft && x < chartRight) {
                         ctx.strokeStyle = '#4b5563';
                         ctx.lineWidth = 1;
                         ctx.setLineDash([4, 4]);
@@ -512,14 +524,13 @@
                         ctx.setLineDash([]);
                         
                         // Month label
-                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                         ctx.fillStyle = '#6b7280';
                         ctx.font = '10px Inter, system-ui, sans-serif';
                         ctx.textAlign = 'left';
-                        ctx.fillText(monthNames[d.date.getMonth()], x + 3, chartTop + 12);
+                        ctx.fillText(monthNames[currentDate.getMonth()], x + 3, chartTop + 12);
                     }
-                    prevMonth = currentMonth;
-                });
+                    currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+                }
                 
                 // Draw target weight line
                 if (targetWeight && !isNaN(targetWeight) && targetWeight >= minWeight && targetWeight <= maxWeight) {
@@ -550,9 +561,10 @@
                     
                     const segments = 50;
                     for (let i = 0; i <= segments; i++) {
-                        const idx = (i / segments) * (data.length - 1);
-                        const x = chartLeft + (i / segments) * chartWidth;
-                        const days = (i / segments) * regression.lastDays;
+                        const t = i / segments;
+                        const currentTime = minTime + t * timeRange;
+                        const x = chartLeft + t * chartWidth;
+                        const days = (currentTime - regression.firstDate) / (1000 * 60 * 60 * 24);
                         const y = yScale(regression.predictDays(days));
                         
                         if (i === 0) {
@@ -622,7 +634,7 @@
                 ctx.lineJoin = 'round';
                 
                 data.forEach((d, i) => {
-                    const x = xScale(i);
+                    const x = xScale(d.date);
                     const y = yScale(d.weight);
                     if (i === 0) {
                         ctx.moveTo(x, y);
@@ -634,7 +646,7 @@
                 
                 // Draw points
                 data.forEach((d, i) => {
-                    const x = xScale(i);
+                    const x = xScale(d.date);
                     const y = yScale(d.weight);
                     
                     ctx.beginPath();
@@ -648,22 +660,29 @@
                     ctx.fill();
                 });
                 
-                // X-axis labels (show some labels to avoid crowding)
-                const maxLabels = 12;
-                const step = Math.max(1, Math.floor(data.length / maxLabels));
-                
+                // X-axis labels (show labels at reasonable intervals based on time span)
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '11px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'center';
                 
+                // Calculate appropriate label interval based on time range
+                const dayRange = timeRange / (1000 * 60 * 60 * 24);
+                const maxLabels = 12;
+                const minLabelSpacing = chartWidth / maxLabels;
+                
+                // Track last label position to avoid overlap
+                let lastLabelX = -Infinity;
+                
                 data.forEach((d, i) => {
-                    if (i % step === 0 || i === data.length - 1) {
-                        const x = xScale(i);
+                    const x = xScale(d.date);
+                    // Show label if it's first, last, or far enough from last label
+                    if (i === 0 || i === data.length - 1 || x - lastLabelX >= minLabelSpacing) {
                         ctx.save();
                         ctx.translate(x, chartBottom + 15);
                         ctx.rotate(-Math.PI / 4);
                         ctx.fillText(formatDate(d.date), 0, 0);
                         ctx.restore();
+                        lastLabelX = x;
                     }
                 });
                 
